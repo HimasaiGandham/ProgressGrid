@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f4;
+            color: #0b0b0b;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 500;
+            margin-bottom: 24px;
+            color: #0b0b0b;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        /* Month Navigation */
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background-color: #fcfcfb;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+        }
+
+        .month-nav button {
+            padding: 8px 12px;
+            border: 0.5px solid #c3c2b7;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .month-nav button:hover {
+            background-color: #f0efec;
+        }
+
+        .month-nav h2 {
+            margin: 0;
+            min-width: 150px;
+            text-align: center;
+            flex: 1;
+        }
+
+        /* Add Habit Form */
+        .add-habit-form {
+            margin-bottom: 24px;
+            padding: 16px;
+            background-color: #fcfcfb;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .form-group input {
+            padding: 8px 12px;
+            border: 0.5px solid #c3c2b7;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .form-group input[type="number"] {
+            width: 80px;
+        }
+
+        .form-group button {
+            padding: 8px 16px;
+            background-color: #2a78d6;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .form-group button:hover {
+            background-color: #1f5aa3;
+        }
+
+        /* Tracker Table */
+        .tracker-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+            background-color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        table thead {
+            background-color: #f5f5f4;
+            border-bottom: 0.5px solid #c3c2b7;
+        }
+
+        table th {
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: 500;
+            color: #0b0b0b;
+        }
+
+        table th:first-child {
+            text-align: left;
+            width: 140px;
+            min-width: 140px;
+        }
+
+        table th.habit-col {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background-color: #f5f5f4;
+        }
+
+        table td {
+            padding: 12px 8px;
+            border-bottom: 0.5px solid #e1e0d9;
+            text-align: center;
+        }
+
+        table td:first-child {
+            text-align: left;
+            font-weight: 500;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            position: sticky;
+            left: 0;
+            background-color: #fff;
+            z-index: 9;
+        }
+
+        table tbody tr:hover {
+            background-color: #fcfcfb;
+        }
+
+        .day-header {
+            width: 28px;
+            min-width: 28px;
+            font-size: 12px;
+            color: #52514e;
+        }
+
+        .checkbox-cell {
+            width: 28px;
+            min-width: 28px;
+        }
+
+        .checkbox-cell input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .stats-cell {
+            width: 50px;
+            min-width: 50px;
+            font-weight: 500;
+            color: #0b0b0b;
+        }
+
+        .goal-cell {
+            width: 50px;
+            min-width: 50px;
+            color: #52514e;
+        }
+
+        .percentage-cell {
+            width: 100px;
+            min-width: 100px;
+        }
+
+        .progress-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .progress-container {
+            width: 30px;
+            height: 4px;
+            background-color: #e1e0d9;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill.excellent {
+            background-color: #0ca30c;
+        }
+
+        .progress-fill.good {
+            background-color: #c98500;
+        }
+
+        .progress-fill.poor {
+            background-color: #e34948;
+        }
+
+        .percentage-text {
+            font-size: 12px;
+            font-weight: 500;
+            color: #0b0b0b;
+            width: 28px;
+            text-align: right;
+        }
+
+        .delete-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background-color: #e34948;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .delete-btn:hover {
+            background-color: #c63737;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #52514e;
+            background-color: #fcfcfb;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin: 0;
+        }
+
+        /* Heatmap Section */
+        .heatmap-section {
+            margin-bottom: 24px;
+            padding: 16px;
+            background-color: #fcfcfb;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+        }
+
+        .heatmap-toggle {
+            padding: 8px 16px;
+            background-color: #2a78d6;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            transition: background-color 0.2s;
+        }
+
+        .heatmap-toggle:hover {
+            background-color: #1f5aa3;
+        }
+
+        .heatmap-content {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .heatmap-content.show {
+            display: block;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .heatmap-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .heatmap-habit-name {
+            width: 120px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .heatmap-days {
+            display: flex;
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+
+        .heatmap-cell {
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+
+        .heatmap-cell.completed {
+            background-color: #0ca30c;
+            opacity: 1;
+        }
+
+        .heatmap-cell.missed {
+            background-color: #e1e0d9;
+        }
+
+        /* Summary Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            padding: 16px;
+            background-color: #fcfcfb;
+            border-radius: 8px;
+            border: 0.5px solid #e1e0d9;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #52514e;
+            text-transform: uppercase;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 500;
+            color: #0b0b0b;
+            margin-bottom: 4px;
+        }
+
+        .stat-percentage {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .stat-percentage.excellent {
+            color: #0ca30c;
+        }
+
+        .stat-percentage.good {
+            color: #c98500;
+        }
+
+        .stat-percentage.poor {
+            color: #e34948;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .form-group {
+                flex-direction: column;
+            }
+
+            .form-group input,
+            .form-group button {
+                width: 100%;
+            }
+
+            .heatmap-habit-name {
+                width: 100px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Habit Tracker</h1>
+
+        <!-- Month Navigation -->
+        <div class="month-nav">
+            <button onclick="previousMonth()">← Previous</button>
+            <h2 id="currentMonth"></h2>
+            <button onclick="nextMonth()">Next →</button>
+        </div>
+
+        <!-- Add Habit Form -->
+        <div class="add-habit-form">
+            <h3>Add New Habit</h3>
+            <div class="form-group">
+                <input 
+                    type="text" 
+                    id="habitInput" 
+                    placeholder="Habit name (e.g., Morning Exercise)"
+                    onkeypress="if(event.key === 'Enter') addHabit()"
+                >
+                <input 
+                    type="number" 
+                    id="goalInput" 
+                    min="1" 
+                    max="31" 
+                    value="31"
+                    placeholder="Goal"
+                >
+                <button onclick="addHabit()">Add Habit</button>
+            </div>
+        </div>
+
+        <!-- Tracker Table -->
+        <div id="trackerContent"></div>
+
+        <!-- Heatmap Section -->
+        <div class="heatmap-section" id="heatmapSection" style="display: none;">
+            <button class="heatmap-toggle" onclick="toggleHeatmap()">🔥 Show Heatmap</button>
+            <div class="heatmap-content" id="heatmapContent">
+                <h3 id="heatmapTitle"></h3>
+                <div class="heatmap-grid" id="heatmapGrid"></div>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div id="statsGrid"></div>
+    </div>
+
+    <script>
+        // State Management
+        let habits = [];
+        let tracker = {};
+        let currentMonth = new Date();
+        let heatmapVisible = false;
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            renderAll();
+        });
+
+        // Storage Functions
+        function loadFromStorage() {
+            const saved = localStorage.getItem('habits');
+            const savedTracker = localStorage.getItem('tracker');
+            if (saved) habits = JSON.parse(saved);
+            if (savedTracker) tracker = JSON.parse(savedTracker);
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('habits', JSON.stringify(habits));
+            localStorage.setItem('tracker', JSON.stringify(tracker));
+        }
+
+        // Month Functions
+        function getMonthKey() {
+            const year = currentMonth.getFullYear();
+            const month = String(currentMonth.getMonth()).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        function getDaysInMonth() {
+            return new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+        }
+
+        function getDaysArray() {
+            return Array.from({ length: getDaysInMonth() }, (_, i) => i + 1);
+        }
+
+        function formatMonth() {
+            return currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        function nextMonth() {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+            renderAll();
+        }
+
+        function previousMonth() {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
+            renderAll();
+        }
+
+        // Habit Functions
+        function addHabit() {
+            const nameInput = document.getElementById('habitInput');
+            const goalInput = document.getElementById('goalInput');
+
+            if (!nameInput.value.trim()) return;
+
+            const habit = {
+                id: Date.now(),
+                name: nameInput.value.trim(),
+                goal: parseInt(goalInput.value) || 31,
+                createdAt: new Date().toISOString()
+            };
+
+            habits.push(habit);
+            nameInput.value = '';
+            goalInput.value = '31';
+            saveToStorage();
+            renderAll();
+        }
+
+        function deleteHabit(id) {
+            habits = habits.filter(h => h.id !== id);
+            const monthKey = getMonthKey();
+            Object.keys(tracker).forEach(key => {
+                if (key.startsWith(`${id}-`)) delete tracker[key];
+            });
+            saveToStorage();
+            renderAll();
+        }
+
+        function toggleDay(habitId, day) {
+            const monthKey = getMonthKey();
+            const key = `${habitId}-${monthKey}-${day}`;
+            tracker[key] = !tracker[key];
+            saveToStorage();
+            renderAll();
+        }
+
+        // Stats Functions
+        function getHabitStats(habitId) {
+            const monthKey = getMonthKey();
+            const daysInMonth = getDaysInMonth();
+            let completed = 0;
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const key = `${habitId}-${monthKey}-${day}`;
+                if (tracker[key]) completed++;
+            }
+
+            return { completed, days: daysInMonth };
+        }
+
+        // Render Functions
+        function renderAll() {
+            renderMonthNav();
+            renderTracker();
+            if (habits.length > 0) {
+                document.getElementById('heatmapSection').style.display = 'block';
+                renderStats();
+            } else {
+                document.getElementById('heatmapSection').style.display = 'none';
+            }
+        }
+
+        function renderMonthNav() {
+            document.getElementById('currentMonth').textContent = formatMonth();
+        }
+
+        function renderTracker() {
+            const monthKey = getMonthKey();
+            const daysInMonth = getDaysInMonth();
+            const days = getDaysArray();
+            let html = '';
+
+            if (habits.length === 0) {
+                html = `<div class="empty-state">
+                    <p>No habits yet. Add one to get started!</p>
+                </div>`;
+            } else {
+                html = `<div class="tracker-table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="habit-col">Habit</th>`;
+                
+                // Day headers
+                days.forEach(day => {
+                    html += `<th class="day-header">${day}</th>`;
+                });
+
+                html += `<th style="width: 50px; min-width: 50px;">Total</th>
+                         <th style="width: 50px; min-width: 50px;">Goal</th>
+                         <th style="width: 100px; min-width: 100px;">%</th>
+                         <th style="width: 40px; min-width: 40px;">Del</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                // Habit rows
+                habits.forEach(habit => {
+                    const stats = getHabitStats(habit.id);
+                    const percentage = Math.round((stats.completed / habit.goal) * 100);
+
+                    html += `<tr>
+                        <td class="habit-col">${habit.name}</td>`;
+
+                    // Day checkboxes
+                    days.forEach(day => {
+                        const key = `${habit.id}-${monthKey}-${day}`;
+                        const isChecked = tracker[key] ? 'checked' : '';
+                        html += `<td class="checkbox-cell">
+                            <input type="checkbox" ${isChecked} 
+                                onchange="toggleDay(${habit.id}, ${day})">
+                        </td>`;
+                    });
+
+                    // Stats
+                    html += `<td class="stats-cell">${stats.completed}</td>
+                             <td class="goal-cell">${habit.goal}</td>
+                             <td class="percentage-cell">
+                                <div class="progress-bar">
+                                    <div class="progress-container">
+                                        <div class="progress-fill ${getProgressClass(percentage)}" 
+                                             style="width: ${Math.min(percentage, 100)}%"></div>
+                                    </div>
+                                    <span class="percentage-text">${percentage}%</span>
+                                </div>
+                             </td>
+                             <td>
+                                <button class="delete-btn" onclick="deleteHabit(${habit.id})">✕</button>
+                             </td>
+                        </tr>`;
+                });
+
+                html += `</tbody>
+                    </table>
+                </div>`;
+            }
+
+            document.getElementById('trackerContent').innerHTML = html;
+        }
+
+        function renderHeatmap() {
+            const monthKey = getMonthKey();
+            const days = getDaysArray();
+            let html = `<div class="heatmap-grid">`;
+
+            habits.forEach(habit => {
+                html += `<div class="heatmap-row">
+                    <div class="heatmap-habit-name">${habit.name}</div>
+                    <div class="heatmap-days">`;
+
+                days.forEach(day => {
+                    const key = `${habit.id}-${monthKey}-${day}`;
+                    const isChecked = tracker[key];
+                    const cellClass = isChecked ? 'completed' : 'missed';
+                    html += `<div class="heatmap-cell ${cellClass}" title="Day ${day}"></div>`;
+                });
+
+                html += `</div></div>`;
+            });
+
+            html += `</div>`;
+            document.getElementById('heatmapGrid').innerHTML = html;
+            document.getElementById('heatmapTitle').textContent = `Completion Heatmap - ${formatMonth()}`;
+        }
+
+        function renderStats() {
+            let html = `<div class="stats-grid">`;
+
+            habits.forEach(habit => {
+                const stats = getHabitStats(habit.id);
+                const percentage = Math.round((stats.completed / habit.goal) * 100);
+                const progressClass = getProgressClass(percentage);
+
+                html += `<div class="stat-card">
+                    <div class="stat-label">${habit.name}</div>
+                    <div class="stat-value">${stats.completed}/${habit.goal}</div>
+                    <div class="stat-percentage ${progressClass}">${percentage}% complete</div>
+                </div>`;
+            });
+
+            html += `</div>`;
+            document.getElementById('statsGrid').innerHTML = html;
+        }
+
+        function toggleHeatmap() {
+            heatmapVisible = !heatmapVisible;
+            const button = document.querySelector('.heatmap-toggle');
+            const content = document.getElementById('heatmapContent');
+
+            if (heatmapVisible) {
+                renderHeatmap();
+                content.classList.add('show');
+                button.textContent = '🔥 Hide Heatmap';
+            } else {
+                content.classList.remove('show');
+                button.textContent = '🔥 Show Heatmap';
+            }
+        }
+
+        function getProgressClass(percentage) {
+            if (percentage >= 80) return 'excellent';
+            if (percentage >= 50) return 'good';
+            return 'poor';
+        }
+    </script>
+</body>
+</html>
