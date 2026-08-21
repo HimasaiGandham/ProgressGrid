@@ -1,4 +1,4 @@
-# 🚀 Progress Grid – Project Introduction
+# 🚀 ProgressGrid – Project Introduction
 
 **Progress Grid** is a web-based **project and task management system** designed to help teams plan, organize, assign, and monitor their work from a single centralized platform. 
 
