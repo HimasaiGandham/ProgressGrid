@@ -1,14 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
     const daysInMonth = 31;
-    const dayNames = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed']; // Starting Jan 1 2026
+    const dayNames = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
 
-    const habits = [
-        { id: 1, name: 'Book Reading', completions: new Set([1,2,3,4,5,6,7, 9,10,11,12, 14, 15, 20, 22, 24,25,26,27]) },
-        { id: 2, name: '1 Hour Gym', completions: new Set([1,2,3, 8,9,10, 14, 19, 21, 23,24,25]) },
-        { id: 3, name: 'Meditation', completions: new Set([3, 7, 13, 17,18,19, 20, 23, 26,27]) },
-        { id: 4, name: 'Drink Water', completions: new Set([2,3,4, 7,8,9,10, 13,14,15, 19, 22, 27]) },
-        { id: 5, name: 'No Sugar', completions: new Set([1, 3,4,5,6,7,8,9,10, 14,15,16,17, 21,22,23,24,25,26, 27]) }
-    ];
+    let habits = [];
+
+    // Fetch habits from backend
+    fetch('http://localhost:8080/tracker-backend-1.0-SNAPSHOT/api/habits')
+        .then(response => response.json())
+        .then(data => {
+            // Convert array of completions to Set for easier lookup
+            habits = data.map(h => ({
+                id: h.id,
+                name: h.name,
+                completions: new Set(h.completions)
+            }));
+            renderGrid();
+        })
+        .catch(err => {
+            console.error('Error fetching habits:', err);
+            // Fallback mock data if server is down
+            habits = [
+                { id: 1, name: 'Book Reading', completions: new Set([1,2,3]) },
+                { id: 2, name: '1 Hour Gym', completions: new Set([1,2]) }
+            ];
+            renderGrid();
+        });
 
     // Generate Day Headers
     const dayHeaderRow = document.getElementById('dayHeaderRow');
@@ -21,8 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const habitTableBody = document.getElementById('habitTableBody');
     const heatmapGrid = document.getElementById('heatmapGrid');
-    
-    // Initialize heatmap array
     const heatmapCounts = new Array(daysInMonth + 1).fill(0);
 
     function renderGrid() {
@@ -40,11 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     heatmapCounts[i]++;
                     totalCompletedAll++;
                 }
-                
                 rowHtml += `<td class="check-cell ${isChecked ? 'checked' : ''}" data-habit="${habit.id}" data-day="${i}">${isChecked ? '✓' : ''}</td>`;
             }
 
-            const percent = Math.round((habit.completions.size / daysInMonth) * 100);
+            const percent = Math.round((habit.completions.size / daysInMonth) * 100) || 0;
             rowHtml += `
                 <td class="row-progress-container">
                     <span class="row-percent">${percent}%</span>
@@ -58,13 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         habitTableBody.innerHTML = tbodyHtml;
 
-        // Overall Monthly Progress
         const overallPercent = Math.round((totalCompletedAll / totalPossibleAll) * 100) || 0;
         document.getElementById('overallProgressFill').style.width = overallPercent + '%';
         document.getElementById('overallPercentage').innerText = overallPercent + '%';
         document.getElementById('totalCompleted').innerText = totalCompletedAll;
 
-        // Render Heatmap
         let heatmapHtml = '';
         for (let i = 1; i <= daysInMonth; i++) {
             const count = heatmapCounts[i];
@@ -73,11 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (count === 2) cellClass = 'heatmap-2';
             else if (count === 3) cellClass = 'heatmap-3';
             else if (count >= 4) cellClass = 'heatmap-4';
-            
             heatmapHtml += `<div class="heatmap-cell ${cellClass}" title="Day ${i}: ${count} habits"></div>`;
         }
         heatmapGrid.innerHTML = heatmapHtml;
-        
         attachClickListeners();
     }
 
@@ -87,16 +96,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const habitId = parseInt(e.target.dataset.habit);
                 const day = parseInt(e.target.dataset.day);
                 const habit = habits.find(h => h.id === habitId);
-                
-                if (habit.completions.has(day)) {
-                    habit.completions.delete(day);
-                } else {
+                const isCompleted = !habit.completions.has(day);
+
+                // Optimistic UI update
+                if (isCompleted) {
                     habit.completions.add(day);
+                } else {
+                    habit.completions.delete(day);
                 }
                 renderGrid();
+
+                // Send to backend
+                fetch('http://localhost:8080/tracker-backend-1.0-SNAPSHOT/api/habits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ habitId, day, isCompleted })
+                }).catch(err => console.error('Failed to save to database', err));
             });
         });
     }
-
-    renderGrid();
 });
