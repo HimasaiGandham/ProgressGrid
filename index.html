@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="tracker-container">
+        <!-- Header Section -->
+        <header class="header-banner">
+            <h1>🌿 HABIT TRACKER</h1>
+        </header>
+
+        <!-- Top Section: Stats and Heatmap -->
+        <div class="top-section">
+            <div class="month-box">
+                <h2>January</h2>
+                <h3>2026</h3>
+            </div>
+            <div class="stats-box">
+                <div class="overall-progress-container">
+                    <p class="section-title">OVERALL MONTHLY PROGRESS</p>
+                    <div class="overall-progress-bar">
+                        <div class="progress-fill" id="overallProgressFill" style="width: 59%;"></div>
+                        <div class="progress-dotted"></div>
+                    </div>
+                    <span class="overall-percentage" id="overallPercentage">59%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-section">
+            <div class="completed-box">
+                <p class="section-title">TOTAL COMPLETED</p>
+                <h2 id="totalCompleted">91</h2>
+            </div>
+            <div class="heatmap-box">
+                <p class="section-title">DAILY ACTIVITY HEATMAP (Darker green = More habits completed)</p>
+                <div class="heatmap-grid" id="heatmapGrid">
+                    <!-- Heatmap cells will be generated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid Section -->
+        <div class="grid-section">
+            <table class="habit-table">
+                <thead>
+                    <tr class="week-header">
+                        <th rowspan="2" class="habit-col-header">HABITS</th>
+                        <th colspan="7">WEEK 1</th>
+                        <th colspan="7">WEEK 2</th>
+                        <th colspan="7">WEEK 3</th>
+                        <th colspan="7">WEEK 4</th>
+                        <th colspan="3">EXTRA DAYS</th>
+                        <th rowspan="2" class="progress-col-header">PROGRESS</th>
+                    </tr>
+                    <tr class="day-header" id="dayHeaderRow">
+                        <!-- Days generated via JS -->
+                    </tr>
+                </thead>
+                <tbody id="habitTableBody">
+                    <!-- Habits generated via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
