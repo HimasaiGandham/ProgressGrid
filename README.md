@@ -30,7 +30,7 @@ By bringing project information into one platform, Progress Grid aims to improve
 
  **Scalable Design** – Provides a foundation for adding advanced project-management features in the future.
 
-## 💻\Technology Stack
+## 💻 Technology Stack
 
  **Frontend:** HTML, CSS, JavaScript
  **Backend:** Java, Spring Boot
