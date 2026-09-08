@@ -2,6 +2,14 @@ const API_URL = 'http://localhost:8080/api/habits';
 
 document.addEventListener('DOMContentLoaded', () => {
     
+    // Auth Check
+    const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
+    if (!userId) {
+        window.location.href = 'login.html';
+        return;
+    }
+
     // State
     let habits = [];
     let currentWeekStart = getMonday(new Date());
@@ -24,11 +32,18 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     function init() {
+        document.querySelector('.user-info h4').innerText = username;
         attachEventListeners();
         fetchHabits();
     }
 
     function attachEventListeners() {
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.clear();
+            window.location.href = 'login.html';
+        });
         // Modal
         addHabitBtn.addEventListener('click', () => addHabitModal.classList.add('active'));
         closeHabitModal.addEventListener('click', () => addHabitModal.classList.remove('active'));
@@ -45,7 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-User-Id': userId
+                    },
                     body: JSON.stringify(newHabit)
                 });
                 if(res.ok) {
@@ -72,7 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchHabits() {
         try {
-            const res = await fetch(API_URL);
+            const res = await fetch(API_URL, {
+                headers: { 'X-User-Id': userId }
+            });
             habits = await res.json();
             
             // Format dates
@@ -168,7 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     await fetch(`${API_URL}/${habitId}/complete`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-User-Id': userId
+                        },
                         body: JSON.stringify({ date: dateStr, completed: isCompleted })
                     });
                     fetchHabits(); // sync stats from server
