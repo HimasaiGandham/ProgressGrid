@@ -34,17 +34,14 @@ public class HabitService {
     @Autowired
     private HabitCategoryRepository categoryRepository;
 
-    // Hardcode userId=1 for now since auth isn't implemented
-    private final Long CURRENT_USER_ID = 1L;
-
-    public List<HabitDTO> getAllHabits() {
-        List<Habit> habits = habitRepository.findByUserId(CURRENT_USER_ID);
+    public List<HabitDTO> getAllHabits(Long userId) {
+        List<Habit> habits = habitRepository.findByUserId(userId);
         return habits.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
-    public HabitDTO createHabit(HabitDTO dto) {
+    public HabitDTO createHabit(Long userId, HabitDTO dto) {
         Habit habit = new Habit();
-        habit.setUserId(CURRENT_USER_ID);
+        habit.setUserId(userId);
         habit.setName(dto.getName());
         habit.setDescription(dto.getDescription());
         habit.setFrequency(dto.getFrequency() != null ? dto.getFrequency() : "Daily");
