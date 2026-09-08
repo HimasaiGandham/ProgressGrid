@@ -18,13 +18,13 @@ public class HabitController {
     private HabitService habitService;
 
     @GetMapping
-    public ResponseEntity<List<HabitDTO>> getAllHabits() {
-        return ResponseEntity.ok(habitService.getAllHabits());
+    public ResponseEntity<List<HabitDTO>> getAllHabits(@RequestHeader("X-User-Id") Long userId) {
+        return ResponseEntity.ok(habitService.getAllHabits(userId));
     }
 
     @PostMapping
-    public ResponseEntity<HabitDTO> createHabit(@RequestBody HabitDTO habitDTO) {
-        return ResponseEntity.ok(habitService.createHabit(habitDTO));
+    public ResponseEntity<HabitDTO> createHabit(@RequestHeader("X-User-Id") Long userId, @RequestBody HabitDTO habitDTO) {
+        return ResponseEntity.ok(habitService.createHabit(userId, habitDTO));
     }
 
     @PostMapping("/{id}/complete")

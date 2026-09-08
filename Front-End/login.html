@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProgressGrid - Sign In</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="brand">
+            <img src="logo.png" alt="ProgressGrid Logo" class="brand-logo">
+            <h2>Welcome to ProgressGrid</h2>
+            <p>Your visual workflow & team collaboration tool</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form active">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="loginUsername" required placeholder="Enter your username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••">
+            </div>
+            <p class="error-msg" id="loginError"></p>
+            <button type="submit" class="btn-primary">Sign In</button>
+            <p class="switch-mode">Don't have an account? <a href="#" id="showSignup">Sign Up</a></p>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signupForm" class="auth-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="signupUsername" required placeholder="Choose a username">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="signupEmail" required placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="signupPassword" required placeholder="••••••••">
+            </div>
+            <p class="error-msg" id="signupError"></p>
+            <button type="submit" class="btn-primary">Sign Up</button>
+            <p class="switch-mode">Already have an account? <a href="#" id="showLogin">Sign In</a></p>
+        </form>
+    </div>
+</div>
+
+<script src="login.js"></script>
+</body>
+</html>
