@@ -13,13 +13,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Percentages are completed / planned, where "planned" respects each activity's cadence:
+ * a DAILY activity is expected once per day, a WEEKLY one once per week. Counting every
+ * activity as due every day is what used to make weekly habits drag the score down.
+ */
 @RestController
 @RequestMapping("/api/progress")
 public class ProgressController {
+
+    private static final String DAILY = "DAILY";
+    private static final String WEEKLY = "WEEKLY";
 
     @Autowired
     private ActivityRepository activityRepository;
@@ -32,13 +41,14 @@ public class ProgressController {
         Long userId = currentUser.getId();
         LocalDate today = LocalDate.now();
 
-        int totalActivities = activityRepository.countByUserId(userId);
-        int completedActivities = completionRepository.countByUserIdAndCompletionDateAndCompletedTrue(userId, today);
+        // A day's score is about daily habits only; weekly ones are not due on any particular day.
+        int planned = activityRepository.countByUserIdAndFrequency(userId, DAILY);
+        int completed = completionRepository.countCompletedOnDateByFrequency(userId, today, DAILY);
 
         ProgressDto progress = new ProgressDto();
-        progress.setPlannedActivities(totalActivities);
-        progress.setCompletedActivities(completedActivities);
-        progress.setDailyPercentage(calculatePercentage(completedActivities, totalActivities));
+        progress.setPlannedActivities(planned);
+        progress.setCompletedActivities(completed);
+        progress.setDailyPercentage(calculatePercentage(completed, planned));
 
         return ResponseEntity.ok(progress);
     }
@@ -49,32 +59,27 @@ public class ProgressController {
         LocalDate today = LocalDate.now();
         LocalDate startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
-        int totalActivitiesPerDay = activityRepository.countByUserId(userId);
-        
-        Map<String, Integer> weeklyData = new LinkedHashMap<>();
-        int totalCompletedThisWeek = 0;
-        int daysPassed = 0;
+        int dailyQuota = activityRepository.countByUserIdAndFrequency(userId, DAILY);
+        int weeklyQuota = activityRepository.countByUserIdAndFrequency(userId, WEEKLY);
 
+        // One bar per weekday, each showing that day's daily-habit completion rate.
+        Map<String, Integer> weeklyData = new LinkedHashMap<>();
         for (int i = 0; i < 7; i++) {
             LocalDate date = startOfWeek.plusDays(i);
-            int completedOnDate = completionRepository.countByUserIdAndCompletionDateAndCompletedTrue(userId, date);
-            
-            int percentage = calculatePercentage(completedOnDate, totalActivitiesPerDay);
-            weeklyData.put(date.getDayOfWeek().toString().substring(0, 3), percentage); // Mon, Tue...
-
-            if (!date.isAfter(today)) {
-                totalCompletedThisWeek += completedOnDate;
-                daysPassed++;
-            }
+            int completedOnDate = completionRepository.countCompletedOnDateByFrequency(userId, date, DAILY);
+            weeklyData.put(date.getDayOfWeek().toString().substring(0, 3), // MON, TUE...
+                    calculatePercentage(completedOnDate, dailyQuota));
         }
 
-        int plannedSoFar = totalActivitiesPerDay * daysPassed;
+        int daysElapsed = (int) ChronoUnit.DAYS.between(startOfWeek, today) + 1;
+        int planned = dailyQuota * daysElapsed + weeklyQuota;
+        int completed = completionRepository.countCompletedInDateRange(userId, startOfWeek, today);
 
         ProgressDto progress = new ProgressDto();
         progress.setWeeklyData(weeklyData);
-        progress.setPlannedActivities(plannedSoFar);
-        progress.setCompletedActivities(totalCompletedThisWeek);
-        progress.setWeeklyAveragePercentage(calculatePercentage(totalCompletedThisWeek, plannedSoFar));
+        progress.setPlannedActivities(planned);
+        progress.setCompletedActivities(completed);
+        progress.setWeeklyAveragePercentage(calculatePercentage(completed, planned));
 
         return ResponseEntity.ok(progress);
     }
@@ -85,22 +90,26 @@ public class ProgressController {
         LocalDate today = LocalDate.now();
         LocalDate startOfMonth = today.with(TemporalAdjusters.firstDayOfMonth());
 
-        int totalActivitiesPerDay = activityRepository.countByUserId(userId);
-        int daysPassed = today.getDayOfMonth();
-        
-        int plannedSoFar = totalActivitiesPerDay * daysPassed;
-        int completedSoFar = completionRepository.countCompletedActivitiesInDateRange(userId, startOfMonth, today);
+        int dailyQuota = activityRepository.countByUserIdAndFrequency(userId, DAILY);
+        int weeklyQuota = activityRepository.countByUserIdAndFrequency(userId, WEEKLY);
+
+        int daysElapsed = today.getDayOfMonth();
+        int weeksElapsed = (daysElapsed + 6) / 7; // part-weeks still count as one
+
+        int planned = dailyQuota * daysElapsed + weeklyQuota * weeksElapsed;
+        int completed = completionRepository.countCompletedInDateRange(userId, startOfMonth, today);
 
         ProgressDto progress = new ProgressDto();
-        progress.setPlannedActivities(plannedSoFar);
-        progress.setCompletedActivities(completedSoFar);
-        progress.setMonthlyPercentage(calculatePercentage(completedSoFar, plannedSoFar));
+        progress.setPlannedActivities(planned);
+        progress.setCompletedActivities(completed);
+        progress.setMonthlyPercentage(calculatePercentage(completed, planned));
 
         return ResponseEntity.ok(progress);
     }
 
+    /** Capped at 100: a weekly habit ticked on several days would otherwise read over target. */
     private int calculatePercentage(int completed, int total) {
-        if (total == 0) return 0;
-        return (int) Math.round((double) completed / total * 100);
+        if (total <= 0) return 0;
+        return Math.min(100, (int) Math.round((double) completed / total * 100));
     }
 }

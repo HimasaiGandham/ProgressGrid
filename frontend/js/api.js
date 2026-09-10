@@ -69,7 +69,9 @@ const api = {
         update: (id, data) => api.request(`/activities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
         delete: (id) => api.request(`/activities/${id}`, { method: 'DELETE' }),
         complete: (id, date) => api.request(`/activities/${id}/complete?date=${date}`, { method: 'POST' }),
-        uncomplete: (id, date) => api.request(`/activities/${id}/uncomplete?date=${date}`, { method: 'POST' })
+        uncomplete: (id, date) => api.request(`/activities/${id}/uncomplete?date=${date}`, { method: 'POST' }),
+        // Which boxes are already ticked between two ISO dates, so the grid can restore itself.
+        completions: (start, end) => api.request(`/activities/completions?start=${start}&end=${end}`)
     },
 
     progress: {
