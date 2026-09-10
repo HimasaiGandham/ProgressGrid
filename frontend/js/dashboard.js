@@ -3,6 +3,7 @@
 window.DashboardManager = (function() {
     let dailyChartInstance = null;
     let weeklyChartInstance = null;
+    let modalsWired = false;
 
     // Dates for the grid
     const getDatesForWeek = () => {
@@ -10,7 +11,7 @@ window.DashboardManager = (function() {
         const today = new Date();
         const dayOfWeek = today.getDay(); // 0 is Sunday
         const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        
+
         const monday = new Date(today);
         monday.setDate(today.getDate() + distanceToMonday);
 
@@ -55,112 +56,136 @@ window.DashboardManager = (function() {
         }
     };
 
+    // Everything that changes when a box is ticked, minus the grid itself - the
+    // checkbox already shows its own new state.
+    const refreshProgress = () => Promise.all([
+        loadDailyProgress(),
+        loadWeeklyProgress(),
+        loadMonthlyProgress(),
+        loadNotifications()
+    ]);
+
     // --- Activities & Grid ---
     const loadActivitiesAndGrid = async () => {
-        const activities = await api.activities.getAll();
-        
+        // Fetch the week's stored ticks alongside the activities, otherwise the grid
+        // renders blank and every past completion looks lost.
+        const [activities, completions] = await Promise.all([
+            api.activities.getAll(),
+            api.activities.completions(formatDateString(weekDates[0]), formatDateString(weekDates[6]))
+        ]);
+
+        const ticked = new Set(
+            (completions || []).filter(c => c.completed).map(c => `${c.activityId}|${c.date}`)
+        );
+
         const gridBody = document.querySelector('#activity-grid-table tbody');
         const emptyDash = document.getElementById('empty-activities-dash');
         const manageList = document.getElementById('manage-activity-list');
-        
+
         gridBody.innerHTML = '';
         manageList.innerHTML = '';
 
         if (activities.length === 0) {
             document.getElementById('activity-grid-table').classList.add('hidden');
             emptyDash.classList.remove('hidden');
-            manageList.innerHTML = '<li class="empty-state">No activities added yet.</li>';
+            const empty = placeholder('No activities added yet.');
+            empty.className = 'empty-state';
+            manageList.appendChild(empty);
             return;
         }
 
         document.getElementById('activity-grid-table').classList.remove('hidden');
         emptyDash.classList.add('hidden');
 
-        // Note: For a real app, we need to fetch which days are completed.
-        // To do this simply without a massive query, we can assume we check daily status 
-        // OR we just send completions for the week from the backend.
-        // Since our backend doesn't have a specific endpoint for the week's grid,
-        // we'll fetch the daily progress or just keep it simple: 
-        // A full app would have a dedicated endpoint for the grid state.
-        // For now, let's just render the grid with checkboxes and handle clicks.
-        
         for (const act of activities) {
-            // Dashboard Grid Row
-            const tr = document.createElement('tr');
-            
-            const tdName = document.createElement('td');
-            tdName.textContent = act.activityName;
-            tr.appendChild(tdName);
-
-            for (let i = 0; i < 7; i++) {
-                const td = document.createElement('td');
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'grid-checkbox';
-                checkbox.dataset.actId = act.id;
-                checkbox.dataset.date = formatDateString(weekDates[i]);
-                
-                // Allow access to future days as requested
-                // if (weekDates[i] > new Date()) {
-                //     checkbox.disabled = true;
-                // }
-
-                checkbox.addEventListener('change', async (e) => {
-                    const id = e.target.dataset.actId;
-                    const date = e.target.dataset.date;
-                    const isChecked = e.target.checked;
-                    
-                    try {
-                        if (isChecked) {
-                            await api.activities.complete(id, date);
-                        } else {
-                            await api.activities.uncomplete(id, date);
-                        }
-                        // Refresh progress
-                        loadDailyProgress();
-                        loadWeeklyProgress();
-                        loadMonthlyProgress();
-                    } catch(err) {
-                        e.target.checked = !isChecked; // revert
-                        alert("Failed to update status");
-                    }
-                });
-
-                td.appendChild(checkbox);
-                tr.appendChild(td);
-            }
-            gridBody.appendChild(tr);
-
-            // Manage Activities List Row
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <div class="activity-info">
-                    <h4>${act.activityName}</h4>
-                    <p>${act.frequency}</p>
-                </div>
-                <div class="activity-actions">
-                    <button class="btn btn-sm btn-danger delete-act-btn" data-id="${act.id}">Delete</button>
-                </div>
-            `;
-            manageList.appendChild(li);
+            gridBody.appendChild(buildGridRow(act, ticked));
+            manageList.appendChild(buildManageRow(act));
         }
+    };
 
-        // Attach delete listeners
-        document.querySelectorAll('.delete-act-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                if(confirm('Are you sure you want to delete this activity?')) {
-                    await api.activities.delete(e.target.dataset.id);
-                    refreshAllData();
+    const buildGridRow = (act, ticked) => {
+        const tr = document.createElement('tr');
+
+        const tdName = document.createElement('td');
+        tdName.textContent = act.activityName;
+        tr.appendChild(tdName);
+
+        for (let i = 0; i < 7; i++) {
+            const dateStr = formatDateString(weekDates[i]);
+            const td = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'grid-checkbox';
+            checkbox.checked = ticked.has(`${act.id}|${dateStr}`);
+            checkbox.setAttribute('aria-label', `${act.activityName} on ${dateStr}`);
+
+            // Future days stay editable on purpose - plan ahead if you want to.
+
+            checkbox.addEventListener('change', async (e) => {
+                const isChecked = e.target.checked;
+                try {
+                    if (isChecked) {
+                        await api.activities.complete(act.id, dateStr);
+                    } else {
+                        await api.activities.uncomplete(act.id, dateStr);
+                    }
+                    await refreshProgress();
+                } catch(err) {
+                    e.target.checked = !isChecked; // revert
+                    alert("Failed to update status");
                 }
             });
+
+            td.appendChild(checkbox);
+            tr.appendChild(td);
+        }
+        return tr;
+    };
+
+    // Built with textContent rather than innerHTML: an activity name is user input
+    // and would otherwise be parsed as markup.
+    const buildManageRow = (act) => {
+        const li = document.createElement('li');
+
+        const info = document.createElement('div');
+        info.className = 'activity-info';
+        const title = document.createElement('h4');
+        title.textContent = act.activityName;
+        const meta = document.createElement('p');
+        meta.textContent = act.description ? `${act.frequency} - ${act.description}` : act.frequency;
+        info.append(title, meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'activity-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-sm btn-outline';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openModal(act));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-sm btn-danger';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete "${act.activityName}"? Its completion history goes with it.`)) return;
+            try {
+                await api.activities.delete(act.id);
+                await refreshAllData();
+            } catch (err) {
+                alert("Failed to delete activity");
+            }
         });
+
+        actions.append(editBtn, deleteBtn);
+        li.append(info, actions);
+        return li;
     };
 
     // --- Progress ---
     const loadDailyProgress = async () => {
         const data = await api.progress.getDaily();
         const ctx = document.getElementById('dailyChart').getContext('2d');
-        
+
         document.getElementById('daily-percentage-text').textContent = `${data.dailyPercentage}%`;
         document.getElementById('prog-daily-comp').textContent = data.completedActivities;
         document.getElementById('prog-daily-plan').textContent = data.plannedActivities;
@@ -169,12 +194,14 @@ window.DashboardManager = (function() {
             dailyChartInstance.destroy();
         }
 
+        const remaining = Math.max(0, data.plannedActivities - data.completedActivities);
+
         dailyChartInstance = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Completed', 'Pending'],
                 datasets: [{
-                    data: [data.completedActivities, data.plannedActivities - data.completedActivities],
+                    data: [data.completedActivities, remaining],
                     backgroundColor: ['#10B981', '#E5E7EB'],
                     borderWidth: 0,
                     cutout: '75%'
@@ -194,7 +221,7 @@ window.DashboardManager = (function() {
     const loadWeeklyProgress = async () => {
         const data = await api.progress.getWeekly();
         const ctx = document.getElementById('weeklyChart').getContext('2d');
-        
+
         document.getElementById('prog-weekly-avg').textContent = `${data.weeklyAveragePercentage}%`;
 
         if (weeklyChartInstance) {
@@ -234,10 +261,10 @@ window.DashboardManager = (function() {
 
     const loadMonthlyProgress = async () => {
         const data = await api.progress.getMonthly();
-        
+
         document.getElementById('monthly-percentage-text').textContent = `${data.monthlyPercentage}%`;
         document.getElementById('monthly-progress-fill').style.width = `${data.monthlyPercentage}%`;
-        
+
         document.getElementById('prog-monthly-comp').textContent = data.completedActivities;
     };
 
@@ -246,51 +273,77 @@ window.DashboardManager = (function() {
         const notifications = await api.notifications.getAll();
         const dashList = document.getElementById('dash-notifications');
         const fullList = document.getElementById('full-notifications-list');
-        
+
         dashList.innerHTML = '';
         fullList.innerHTML = '';
 
         if (notifications.length === 0) {
-            dashList.innerHTML = '<li>No recent notifications.</li>';
-            fullList.innerHTML = '<li>You have no notifications.</li>';
+            dashList.appendChild(placeholder('No recent notifications.'));
+            fullList.appendChild(placeholder('You have no notifications.'));
             return;
         }
 
-        notifications.slice(0, 3).forEach(n => {
-            const li = document.createElement('li');
-            li.textContent = n.message;
-            if(!n.isRead) li.classList.add('unread');
-            dashList.appendChild(li);
-        });
+        notifications.slice(0, 3).forEach(n => dashList.appendChild(buildNotification(n)));
+        notifications.forEach(n => fullList.appendChild(buildNotification(n)));
+    };
 
-        notifications.forEach(n => {
-            const li = document.createElement('li');
-            li.textContent = n.message;
-            if(!n.isRead) li.classList.add('unread');
-            fullList.appendChild(li);
-        });
+    const placeholder = (text) => {
+        const li = document.createElement('li');
+        li.textContent = text;
+        return li;
+    };
+
+    const buildNotification = (n) => {
+        const li = document.createElement('li');
+        li.textContent = n.message;
+
+        if (!n.isRead) {
+            li.classList.add('unread');
+            li.title = 'Click to mark as read';
+            li.addEventListener('click', async () => {
+                try {
+                    await api.notifications.markRead(n.id);
+                    await loadNotifications();
+                } catch (err) {
+                    console.error("Failed to mark notification read", err);
+                }
+            });
+        }
+        return li;
     };
 
     // --- Modals & Forms ---
+    // Null activity means "create"; passing one switches the same modal into edit mode.
+    const openModal = (activity) => {
+        document.getElementById('modal-title').textContent = activity ? 'Edit Activity' : 'Add New Activity';
+        document.getElementById('act-id').value = activity ? activity.id : '';
+        document.getElementById('act-name').value = activity ? activity.activityName : '';
+        document.getElementById('act-desc').value = (activity && activity.description) || '';
+        document.getElementById('act-freq').value = (activity && activity.frequency) || 'DAILY';
+        document.getElementById('activity-modal').classList.remove('hidden');
+    };
+
+    const closeModal = () => {
+        document.getElementById('activity-modal').classList.add('hidden');
+        document.getElementById('activity-form').reset();
+        document.getElementById('act-id').value = '';
+    };
+
     const setupModals = () => {
-        const modal = document.getElementById('activity-modal');
-        const btnDash = document.getElementById('btn-add-activity-dash');
-        const btnManage = document.getElementById('btn-new-activity');
-        const closeBtn = document.querySelector('.close-modal');
+        // init() runs again whenever showApp() fires app-ready, e.g. logging out and back
+        // in without a reload. Binding twice would submit every save twice.
+        if (modalsWired) return;
+        modalsWired = true;
+
         const form = document.getElementById('activity-form');
 
-        const openModal = () => modal.classList.remove('hidden');
-        const closeModal = () => {
-            modal.classList.add('hidden');
-            form.reset();
-        };
-
-        btnDash.addEventListener('click', openModal);
-        btnManage.addEventListener('click', openModal);
-        closeBtn.addEventListener('click', closeModal);
+        document.getElementById('btn-add-activity-dash').addEventListener('click', () => openModal(null));
+        document.getElementById('btn-new-activity').addEventListener('click', () => openModal(null));
+        document.querySelector('.close-modal').addEventListener('click', closeModal);
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const id = document.getElementById('act-id').value;
             const data = {
                 activityName: document.getElementById('act-name').value,
                 description: document.getElementById('act-desc').value,
@@ -298,9 +351,13 @@ window.DashboardManager = (function() {
             };
 
             try {
-                await api.activities.create(data);
+                if (id) {
+                    await api.activities.update(id, data);
+                } else {
+                    await api.activities.create(data);
+                }
                 closeModal();
-                refreshAllData();
+                await refreshAllData();
             } catch(err) {
                 alert("Failed to save activity");
             }

@@ -308,4 +308,5 @@ input:focus, textarea:focus, select:focus {
 .notification-list li.unread {
     font-weight: 600;
     color: var(--primary-color);
+    cursor: pointer;
 }
