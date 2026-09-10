@@ -6,5 +6,7 @@ import java.util.List;
 
 public interface ActivityRepository extends JpaRepository<Activity, Long> {
     List<Activity> findByUserId(Long userId);
-    int countByUserId(Long userId);
+
+    /** How many activities the user expects to do at a given cadence ("DAILY" / "WEEKLY"). */
+    int countByUserIdAndFrequency(Long userId, String frequency);
 }

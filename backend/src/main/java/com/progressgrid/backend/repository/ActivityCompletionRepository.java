@@ -11,15 +11,26 @@ import java.util.Optional;
 
 public interface ActivityCompletionRepository extends JpaRepository<ActivityCompletion, Long> {
 
-    Optional<ActivityCompletion> findByActivityIdAndCompletionDate(Long activityId, LocalDate completionDate);
+    /** Scoped by user as well as activity so a stray id can never reach another account's row. */
+    Optional<ActivityCompletion> findByActivityIdAndUserIdAndCompletionDate(
+            Long activityId, Long userId, LocalDate completionDate);
 
-    List<ActivityCompletion> findByUserIdAndCompletionDate(Long userId, LocalDate completionDate);
+    @Query("SELECT ac FROM ActivityCompletion ac WHERE ac.user.id = :userId "
+            + "AND ac.completionDate BETWEEN :startDate AND :endDate")
+    List<ActivityCompletion> findByUserIdAndDateRange(@Param("userId") Long userId,
+                                                     @Param("startDate") LocalDate startDate,
+                                                     @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT ac FROM ActivityCompletion ac WHERE ac.user.id = :userId AND ac.completionDate >= :startDate AND ac.completionDate <= :endDate")
-    List<ActivityCompletion> findByUserIdAndDateRange(@Param("userId") Long userId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    @Query("SELECT COUNT(ac) FROM ActivityCompletion ac WHERE ac.user.id = :userId "
+            + "AND ac.completionDate = :date AND ac.completed = true "
+            + "AND ac.activity.frequency = :frequency")
+    int countCompletedOnDateByFrequency(@Param("userId") Long userId,
+                                        @Param("date") LocalDate date,
+                                        @Param("frequency") String frequency);
 
-    int countByUserIdAndCompletionDateAndCompletedTrue(Long userId, LocalDate completionDate);
-
-    @Query("SELECT COUNT(ac) FROM ActivityCompletion ac WHERE ac.user.id = :userId AND ac.completionDate >= :startDate AND ac.completionDate <= :endDate AND ac.completed = true")
-    int countCompletedActivitiesInDateRange(@Param("userId") Long userId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    @Query("SELECT COUNT(ac) FROM ActivityCompletion ac WHERE ac.user.id = :userId "
+            + "AND ac.completionDate BETWEEN :startDate AND :endDate AND ac.completed = true")
+    int countCompletedInDateRange(@Param("userId") Long userId,
+                                  @Param("startDate") LocalDate startDate,
+                                  @Param("endDate") LocalDate endDate);
 }
