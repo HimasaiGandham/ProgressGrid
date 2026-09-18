@@ -1,7 +1,6 @@
 package com.progressgrid.api.controller;
 
 import com.progressgrid.api.dto.*;
-import com.progressgrid.api.model.User;
 import com.progressgrid.api.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +22,7 @@ public class AuthController {
             AuthResponseDTO response = authService.login(loginDTO);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -33,23 +32,57 @@ public class AuthController {
             AuthResponseDTO response = authService.signup(signupDTO);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(@RequestParam(value = "userId", required = false) Long userId) {
-        if (userId == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "User ID is required"));
+    @PostMapping("/forgot-password/send-otp")
+    public ResponseEntity<?> sendOtp(@RequestBody SendOtpDTO dto) {
+        try {
+            String maskedEmail = authService.sendPasswordResetOtp(dto.getIdentifier());
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "message", "Verification code sent to " + maskedEmail,
+                    "maskedEmail", maskedEmail
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()
+            ));
         }
-        User user = authService.getUserById(userId);
-        if (user == null) {
-            return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/forgot-password/verify-otp")
+    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpDTO dto) {
+        try {
+            boolean valid = authService.verifyPasswordResetOtp(dto.getIdentifier(), dto.getOtp());
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "verified", valid,
+                    "message", "OTP verified successfully. You may now reset your password."
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()
+            ));
         }
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "email", user.getEmail()
-        ));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordDTO resetDTO) {
+        try {
+            authService.resetPassword(resetDTO);
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "message", "Password has been reset successfully. You can now sign in."
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()
+            ));
+        }
     }
 }
