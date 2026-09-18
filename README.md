@@ -1,113 +1,93 @@
 # ProgressGrid
 
-A personal habit tracker. You define the activities you want to do, tick them off on a
-weekly grid, and the dashboard shows how much of your plan you actually completed —
-daily, weekly and monthly.
+ProgressGrid is a visual habit tracking and personal progress dashboard built with a Spring Boot 3 Java backend, MySQL persistence, and a modern responsive dark glassmorphic web interface.
 
-Single user per account: everything you create is yours alone, and no account can see
-or change another's data.
+---
 
-## Features
+## Key Highlights
 
-- **Weekly grid** — one row per activity, one column per weekday. Tick a box to record a
-  completion; past ticks are loaded back when you return.
-- **Daily / weekly / monthly progress** — a doughnut chart for today, a bar chart for the
-  week, and a progress bar for the month.
-- **Cadence-aware scoring** — a `DAILY` activity is expected once a day, a `WEEKLY` one
-  once a week, and the percentages respect that difference.
-- **Activity management** — create, rename, re-cadence, and delete activities.
-- **Notifications** — you get one when you clear every daily activity for a date. Click a
-  notification to mark it read.
+- **User Authentication & Verification**:
+  - Secure registration and login with Username or Email.
+  - Plain and BCrypt hashed password verification.
+  - Session tokens and authenticated user state tracking.
+- **Email OTP Verification**:
+  - Direct HTTP/2 transactional email integration with **Resend API** (`https://api.resend.com/emails`).
+  - Automatic SMTP mail server fallback & console fallback for local development.
+  - 6-digit cryptographic numeric codes with 10-minute validity.
+  - 3-step security modal with masked email dispatch, 60s resend timer, and password reset.
+- **Habit Tracking & Weekly Completion Grid**:
+  - Create, customize, and categorize habits (Health, Work, Learning, Fitness, Mindfulness).
+  - 7-day completion status grid with real-time toggle checkboxes.
+  - Relational database persistence linking users, habits, categories, and completion dates.
+- **Progress Analytics & Streaks**:
+  - Current streak and all-time best streak calculation engine.
+  - Overall completion rate scoring across tracked habits.
+  - Interactive Chart.js weekly trend bar chart with smooth animations.
+- **UI & Presentation Architecture**:
+  - Dark glassmorphic aesthetic with custom CSS variables and neon gradients.
+  - Mobile-responsive layout, top brand header, overview cards, and interactive modals.
 
-## Tech stack
+---
 
-| Layer | What |
-|---|---|
-| Frontend | HTML, CSS, vanilla JavaScript, Chart.js (CDN) — no build step |
-| Backend | Java 17, Spring Boot 4.1.1, Spring Security, JWT (jjwt) |
-| Database | MySQL 8 (H2 in-memory for tests) |
+## Directory Structure
 
-## Running it
+```
+ProgressGrid/
+├── Back-End/              # Spring Boot 3 / Java 17 REST API
+│   ├── pom.xml
+│   ├── src/main/java/com/progressgrid/api/
+│   │   ├── controller/    # AuthController, HabitController
+│   │   ├── dto/           # Auth, OTP, ResetPassword, Habit DTOs
+│   │   ├── model/         # User, Habit, HabitCategory, HabitCompletion
+│   │   ├── repository/    # Spring Data JPA Repositories
+│   │   └── service/       # AuthService, OtpService, EmailService, HabitService
+│   └── src/main/resources/application.properties
+├── Front-End/             # Vanilla HTML, CSS, JavaScript (No build required)
+│   ├── login.html         # Login, signup & OTP verification view
+│   ├── login.css          # Auth & OTP modal styles
+│   ├── login.js           # Auth & OTP handler logic
+│   ├── index.html         # Dashboard & habit tracker view
+│   ├── style.css          # Design system & dashboard styling
+│   ├── app.js             # Habit grid, Chart.js & progress calculations
+│   └── logo.png           # Official brand logo
+├── Data-Base/             # MySQL Database DDL & Seed Scripts
+│   ├── schema.sql         # Table schemas for users, habits, completions
+│   └── seed.sql           # Initial category definitions and seed routines
+├── dev_server.py          # Python dev server with /api proxy to backend
+├── run-app.bat            # Quick startup script for Windows
+├── run-app.ps1            # PowerShell automation script
+└── README.md
+```
 
-**1. Create the database and user**
+---
 
+## Running the Application
+
+### 1. Database Setup
+```sql
+mysql -u root -p < Data-Base/schema.sql
+mysql -u root -p < Data-Base/seed.sql
+```
+
+### 2. Start the Backend (Spring Boot)
 ```bash
-mysql -u root -p < database/database_setup.sql
+cd Back-End
+mvn spring-boot:run
 ```
+*Listens on port `8080` (`http://localhost:8080`).*
 
-Tables are created automatically on first start (`spring.jpa.hibernate.ddl-auto=update`).
-`database/schema.sql` documents the same schema if you prefer to create it by hand.
-
-**2. Start the backend**
-
+### 3. Start the Frontend Dev Server
 ```bash
-cd backend && ./mvnw spring-boot:run
+python dev_server.py
 ```
+*Open `http://localhost:3000` in your browser to access the complete application with live `/api` proxying.*
 
-It listens on `http://localhost:8080`.
+---
 
-**3. Open the frontend**
+## Feature Branches on GitHub
 
-Open `frontend/index.html` in a browser. It calls `http://localhost:8080/api` directly, so
-no web server is needed.
-
-### Configuration
-
-Everything has a working local default; override with environment variables in production.
-
-| Variable | Default | Notes |
-|---|---|---|
-| `DB_URL` | `jdbc:mysql://localhost:3306/progressgrid_db?...` | |
-| `DB_USERNAME` | `pg_user` | |
-| `DB_PASSWORD` | `password123` | The local dev password from `database_setup.sql`. Change it anywhere real. |
-| `JWT_SECRET` | *(unset)* | **Set this in production.** Unset means a random key is generated at startup, so every token dies on restart. Must be at least 64 characters (HS512). |
-| `JWT_EXPIRATION_MS` | `86400000` (24h) | |
-
-## API
-
-All endpoints except `/api/auth/**` require `Authorization: Bearer <token>`.
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/auth/register` | Create an account (`name`, `email`, `password`) |
-| `POST` | `/api/auth/login` | Exchange credentials for a JWT (`accessToken`) |
-| `GET` | `/api/activities` | List your activities |
-| `POST` | `/api/activities` | Create one (`activityName`, `description`, `frequency`) |
-| `PUT` | `/api/activities/{id}` | Update one |
-| `DELETE` | `/api/activities/{id}` | Delete one, and its completion history |
-| `GET` | `/api/activities/completions?start=&end=` | Ticks in a date range, for the grid |
-| `POST` | `/api/activities/{id}/complete?date=` | Tick a day (defaults to today) |
-| `POST` | `/api/activities/{id}/uncomplete?date=` | Untick a day |
-| `GET` | `/api/progress/daily` | Today's completion |
-| `GET` | `/api/progress/weekly` | This week, plus a per-weekday breakdown |
-| `GET` | `/api/progress/monthly` | This month to date |
-| `GET` | `/api/notifications` | Your notifications, newest first |
-| `PUT` | `/api/notifications/{id}/read` | Mark one read |
-
-Dates are ISO `yyyy-MM-dd`. Weeks run Monday to Sunday.
-
-### How progress is calculated
-
-`percentage = completed / planned`, capped at 100. What counts as *planned* depends on cadence:
-
-- **Daily** — planned is your `DAILY` activity count. Weekly activities are not due on any
-  particular day, so they are excluded from the daily score.
-- **Weekly** — planned is `daily activities × days elapsed this week + weekly activities`.
-- **Monthly** — planned is `daily activities × days elapsed + weekly activities × weeks elapsed`.
-
-## Project layout
-
-```
-backend/     Spring Boot API - controllers, JPA entities, repositories, JWT security
-database/    MySQL setup script and schema reference
-frontend/    index.html plus css/ and js/ - open it directly, no build
-```
-
-## Tests
-
-```bash
-cd backend && ./mvnw test
-```
-
-13 API tests run against in-memory H2, so no local MySQL is needed. They cover the auth
-flow, per-user isolation, grid persistence, cadence-aware progress maths, and notifications.
+- **Login Page Verification**: [feature/login-page-verification](https://github.com/HimasaiGandham/ProgressGrid/tree/feature/login-page-verification)
+- **Email OTP Verification**: [feature/otp-verification](https://github.com/HimasaiGandham/ProgressGrid/tree/feature/otp-verification)
+- **Habit Tracking System**: [feature/habit-tracking](https://github.com/HimasaiGandham/ProgressGrid/tree/feature/habit-tracking)
+- **Progress & Streak Analytics**: [feature/progress-tracking](https://github.com/HimasaiGandham/ProgressGrid/tree/feature/progress-tracking)
+- **UI Dashboard & Styling**: [feature/ui-dashboard](https://github.com/HimasaiGandham/ProgressGrid/tree/feature/ui-dashboard)
