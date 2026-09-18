@@ -1,23 +1,24 @@
-# ProgressGrid - Habit Tracking & Management
+# ProgressGrid - Progress Tracking & Streak Analytics
 
-This branch (`feature/habit-tracking`) implements the core habit tracking system, including categorization, weekly completion grid, toggles, and relational database persistence.
+This branch (`feature/progress-tracking`) introduces real-time habit completion analytics, streak calculation algorithms, and progress visualization charts.
 
 ## Features Included
-- **Habit Lifecycle Management**: Create, edit, list, and delete habits linked to user accounts.
-- **Categorization**: Color-coded habit categories (Health, Work, Learning, Fitness, Mindfulness).
-- **Weekly Completion Grid**: 7-day visual status grid with instantaneous checkmark toggling.
-- **Relational Persistence**: MySQL schema backing `habits`, `habit_categories`, and `habit_completions`.
+- **Streak Calculation Engine**:
+  - **Current Streak**: Determines active contiguous completion chains up to the current date (accounting for grace periods if today is not yet checked).
+  - **Best Streak**: Computes historical maximum consecutive completion runs across all recorded completion dates.
+- **Completion Rate Scoring**:
+  - Computes exact percentage completion based on days elapsed since routine initiation versus recorded completions.
+- **Chart.js Progress Visualizations**:
+  - Weekly habit completion trend bar chart.
+  - Interactive tooltips, responsive canvas rendering, and custom color gradients.
+- **Progress Metric Cards**:
+  - Total Active Habits, Overall Completion Rate (%), Current Streak, and Best Streak counters.
 
 ## Architecture
 - **Front-End**:
-  - `Front-End/app.js`: Dynamic habit grid generation, completion day toggling, modal creation workflows, and real-time state synchronization.
-  - `Front-End/index.html`: Weekly habit grid table markup and habit creation modal.
-  - `Front-End/style.css`: Grid layout styling, custom checkboxes, badge tags, and transitions.
+  - `Front-End/app.js`: Progress calculations, Chart.js dataset generation, DOM counter updates, and animated progress rings.
+  - `Front-End/index.html`: Progress analytics metrics section and weekly trend canvas.
+  - `Front-End/style.css`: Progress indicators, streak badges, and chart container styling.
 - **Back-End (Spring Boot 3 / Java 17)**:
-  - `HabitController.java`: Endpoints for habit listing, creation, and day toggles (`/api/habits`, `/api/habits/{id}/toggle-day`, `/api/habits/categories`).
-  - `HabitService.java`: Business logic managing habit records, category mappings, and completion entities.
-  - JPA Models: `Habit.java`, `HabitCategory.java`, `HabitCompletion.java`.
-  - Repositories: `HabitRepository.java`, `HabitCategoryRepository.java`, `HabitCompletionRepository.java`.
-- **Data-Base**:
-  - `Data-Base/schema.sql`: DDL for habits, categories, and completion tracking.
-  - `Data-Base/seed.sql`: Seed data for default habit categories and sample routines.
+  - `HabitService.java`: `calculateStreaksAndStats` algorithm resolving contiguous calendar intervals and percentage scores.
+  - `HabitDTO.java`: Exposes `currentStreak`, `bestStreak`, `completedDays`, and `completionPercentage`.
