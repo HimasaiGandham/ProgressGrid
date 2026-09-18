@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProgressGrid - Habit Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=35">
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="dashboard-container">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+        <div class="logo">
+            <img src="logo.png?v=20" alt="ProgressGrid" class="sidebar-logo">
+        </div>
+        
+        <nav class="nav-links">
+            <a href="#" class="active" id="navDashboard"><span class="icon">dashboard</span> Dashboard</a>
+            <a href="#" id="navHabits"><span class="icon">check_circle</span> My Habits</a>
+            <a href="#" id="navStats"><span class="icon">bar_chart</span> Statistics</a>
+            <a href="#" id="navCalendar"><span class="icon">calendar_today</span> Calendar</a>
+            <a href="#" id="navSettings"><span class="icon">settings</span> Profile Settings</a>
+        </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        
+        <!-- TAB VIEW 1: DASHBOARD VIEW -->
+        <div id="dashboardView" class="tab-view active">
+            <!-- HEADER -->
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1>Habit Tracker</h1>
+                    <p id="currentDateDisplay">September 2026</p>
+                </div>
+                <div class="header-right-area">
+                    <!-- Profile in Top Right Corner on Top of Add Habit -->
+                    <div class="top-user-profile" id="userProfileBtn" role="button" tabindex="0" title="Click to view & edit Profile Settings">
+                        <div class="avatar" id="sidebarAvatar">
+                            <span id="sidebarAvatarText">U</span>
+                            <img id="sidebarAvatarImg" src="" alt="User Avatar" style="display: none;">
+                        </div>
+                        <div class="user-info">
+                            <h4 id="sidebarUsername">User</h4>
+                            <span class="user-role">View Profile</span>
+                        </div>
+                    </div>
+
+                    <div class="header-actions">
+                        <div class="week-nav">
+                            <button id="prevWeekBtn">&lt;</button>
+                            <span id="currentWeekLabel">Current Week</span>
+                            <button id="nextWeekBtn">&gt;</button>
+                        </div>
+                        <button class="btn-primary" id="addHabitBtn">+ Add Habit</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- SUMMARY SECTION -->
+            <section class="summary-cards">
+                <div class="card summary-card">
+                    <h3>Total Habits</h3>
+                    <h2 id="sumTotalHabits">0</h2>
+                </div>
+                <div class="card summary-card">
+                    <h3>Current Streak</h3>
+                    <h2 id="sumCurrentStreak">0 days</h2>
+                </div>
+                <div class="card summary-card">
+                    <h3>Best Streak</h3>
+                    <h2 id="sumBestStreak">0 days</h2>
+                </div>
+                <div class="card summary-card">
+                    <h3>Weekly Completion</h3>
+                    <h2 id="sumWeeklyProgress">0%</h2>
+                </div>
+                <div class="card summary-card">
+                    <h3>Monthly Completion</h3>
+                    <h2 id="sumMonthlyProgress">0%</h2>
+                </div>
+            </section>
+
+            <div class="dashboard-grid">
+                <!-- MAIN HABIT GRID -->
+                <section class="habit-grid-section card">
+                    <h2>Habit Grid</h2>
+                    <div class="table-responsive">
+                        <table class="habit-table">
+                            <thead>
+                                <tr id="dayHeaderRow">
+                                    <th>Habit</th>
+                                    <!-- Days injected by JS -->
+                                </tr>
+                            </thead>
+                            <tbody id="habitTableBody">
+                                <!-- Habits injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- RIGHT PANELS -->
+                <aside class="right-panels">
+                    <section class="card">
+                        <h2>Weekly Progress Graph</h2>
+                        <canvas id="weeklyChart"></canvas>
+                    </section>
+
+                    <section class="card today-habits-card">
+                        <h2>Today's Habits</h2>
+                        <div id="todayHabitsList" class="today-habits-list">
+                            <!-- Today habits injected by JS -->
+                        </div>
+                    </section>
+
+                    <section class="card top-habits-card">
+                        <h2>Habit Performance</h2>
+                        <div id="topHabitsList" class="top-habits-list">
+                            <!-- Top habits injected by JS -->
+                        </div>
+                    </section>
+                </aside>
+            </div>
+        </div>
+
+        <!-- TAB VIEW 2: PROFILE SETTINGS VIEW -->
+        <div id="profileView" class="tab-view" style="display: none;">
+            <!-- HEADER -->
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1>Profile Settings</h1>
+                    <p>Manage your personal details and profile picture</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" id="backToDashboardBtn">← Back to Dashboard</button>
+                </div>
+            </header>
+
+            <div class="profile-container">
+                <div class="profile-card card">
+                    
+                    <!-- TOP: Profile Picture Option -->
+                    <div class="profile-photo-section">
+                        <div class="photo-avatar-wrapper" id="profileAvatarLarge" title="Click to browse photos from your computer">
+                            <span id="largeAvatarInitial">U</span>
+                            <img id="largeAvatarImg" src="" alt="Profile Photo" style="display: none;">
+                            <div class="avatar-hover-overlay">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                    <circle cx="12" cy="13" r="4"></circle>
+                                </svg>
+                                <span>Change</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden file input to browse computer photos via OS file explorer -->
+                        <input type="file" id="photoFileInput" accept="image/*" style="display: none;">
+                        
+                        <div class="photo-meta">
+                            <h3>Profile Picture</h3>
+                            <p class="photo-subtitle">Click the picture or "Browse Photo" to select an image from your computer</p>
+                            <div class="photo-action-buttons">
+                                <button type="button" class="btn-photo-browse" id="triggerBrowseBtn">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    Browse Photo
+                                </button>
+                                <button type="button" class="btn-photo-remove" id="triggerRemoveBtn" style="display: none;">
+                                    Remove Photo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-divider"></div>
+
+                    <!-- Profile Details Form -->
+                    <form id="profileDetailsForm" class="profile-details-form">
+                        <div class="profile-form-grid">
+                            <!-- 1. Name (Full Name) -->
+                            <div class="form-group">
+                                <label for="profileNameInput">Name</label>
+                                <input type="text" id="profileNameInput" placeholder="Enter your full name" required>
+                            </div>
+
+                            <!-- 2. User Name -->
+                            <div class="form-group">
+                                <label for="profileUsernameInput">User Name</label>
+                                <input type="text" id="profileUsernameInput" placeholder="Enter username" required>
+                            </div>
+
+                            <!-- 3. Mail (Email) -->
+                            <div class="form-group">
+                                <label for="profileEmailInput">Mail (Email)</label>
+                                <input type="email" id="profileEmailInput" placeholder="Enter your email address" required>
+                            </div>
+
+                            <!-- 4. Mobile Number -->
+                            <div class="form-group">
+                                <label for="profileMobileInput">Mobile Number</label>
+                                <input type="tel" id="profileMobileInput" placeholder="Enter your mobile number">
+                            </div>
+                        </div>
+
+                        <!-- Feedback Toast Alert -->
+                        <div id="profileAlertMsg" class="profile-alert" style="display: none;"></div>
+
+                        <!-- Action Buttons -->
+                        <div class="profile-form-actions">
+                            <button type="submit" class="btn-primary" id="saveProfileBtn">Save Changes</button>
+                            <button type="button" class="btn-secondary" id="clearFieldsBtn">Clear All</button>
+                            <button type="button" class="btn-logout" id="logoutBtn" title="Logout of ProgressGrid">
+                                <span>Logout</span>
+                                <svg class="poweroff-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ADD HABIT MODAL -->
+<div id="addHabitModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create New Habit</h2>
+            <span class="close-modal" id="closeHabitModal">&times;</span>
+        </div>
+        <form id="addHabitForm">
+            <div class="form-group">
+                <label>Habit Name</label>
+                <input type="text" id="habitName" required placeholder="e.g., Drink Water">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="habitCategory">
+                    <option value="Health">Health</option>
+                    <option value="Fitness">Fitness</option>
+                    <option value="Study">Study</option>
+                    <option value="Work">Work</option>
+                    <option value="Personal">Personal</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Frequency</label>
+                <select id="habitFrequency">
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" id="habitStartDate" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancelHabitBtn">Cancel</button>
+                <button type="submit" class="btn-primary">Create Habit</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="app.js?v=35"></script>
+</body>
+</html>
