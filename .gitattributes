@@ -1,0 +1,3 @@
+# GitHub Linguist language overrides
+# Vendor frontend auth utility to keep Java as the primary language in GitHub statistics
+Front-End/login.js linguist-vendored
