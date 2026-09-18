@@ -1,6 +1,6 @@
 // api.js - Core API wrapper
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = `${window.location.origin}/api`;
 
 const api = {
     getToken: () => localStorage.getItem('progressgrid_token'),

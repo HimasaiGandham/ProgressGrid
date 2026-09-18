@@ -1,113 +1,23 @@
-# ProgressGrid
+# 🎨 ProgressGrid - Frontend
 
-A personal habit tracker. You define the activities you want to do, tick them off on a
-weekly grid, and the dashboard shows how much of your plan you actually completed —
-daily, weekly and monthly.
+This directory contains the user interface and presentation logic for the ProgressGrid Habit Tracking Dashboard. It is built using **Vanilla HTML, CSS, and JavaScript** without any heavy frameworks, ensuring it is lightweight, lightning-fast, and easy to customize.
 
-Single user per account: everything you create is yours alone, and no account can see
-or change another's data.
+## 📂 File Structure & Purpose
 
-## Features
+- **`index.html`**
+  The main entry point for the application. It contains the complete structural layout of the dashboard, including the sidebar navigation, summary cards, the dynamic habit grid skeleton, right-side panels (for charts and today's habits), and the "+ Add Habit" modal.
 
-- **Weekly grid** — one row per activity, one column per weekday. Tick a box to record a
-  completion; past ticks are loaded back when you return.
-- **Daily / weekly / monthly progress** — a doughnut chart for today, a bar chart for the
-  week, and a progress bar for the month.
-- **Cadence-aware scoring** — a `DAILY` activity is expected once a day, a `WEEKLY` one
-  once a week, and the percentages respect that difference.
-- **Activity management** — create, rename, re-cadence, and delete activities.
-- **Notifications** — you get one when you clear every daily activity for a date. Click a
-  notification to mark it read.
+- **`style.css`**
+  The global stylesheet. It defines the beautiful pastel design system, responsive flexbox/grid layouts, dynamic hover effects, and custom CSS variables (like the heatmap completion colors `--c-0` through `--c-4`).
 
-## Tech stack
+- **`app.js`**
+  The core frontend application logic. It is responsible for:
+  - **Fetching Data**: Communicating with the Spring Boot backend (`http://localhost:8080/api/habits`).
+  - **Dynamic Rendering**: Injecting the habits into the grid and updating the dates dynamically based on the current week.
+  - **Interactivity**: Handling user clicks on checkboxes (optimistic UI updates) and form submissions for creating new habits.
+  - **Calculations & Visuals**: Aggregating completion percentages, streaks, and rendering the Weekly Progress graph using **Chart.js**.
 
-| Layer | What |
-|---|---|
-| Frontend | HTML, CSS, vanilla JavaScript, Chart.js (CDN) — no build step |
-| Backend | Java 17, Spring Boot 4.1.1, Spring Security, JWT (jjwt) |
-| Database | MySQL 8 (H2 in-memory for tests) |
+## 🚀 How to Run
 
-## Running it
-
-**1. Create the database and user**
-
-```bash
-mysql -u root -p < database/database_setup.sql
-```
-
-Tables are created automatically on first start (`spring.jpa.hibernate.ddl-auto=update`).
-`database/schema.sql` documents the same schema if you prefer to create it by hand.
-
-**2. Start the backend**
-
-```bash
-cd backend && ./mvnw spring-boot:run
-```
-
-It listens on `http://localhost:8080`.
-
-**3. Open the frontend**
-
-Open `frontend/index.html` in a browser. It calls `http://localhost:8080/api` directly, so
-no web server is needed.
-
-### Configuration
-
-Everything has a working local default; override with environment variables in production.
-
-| Variable | Default | Notes |
-|---|---|---|
-| `DB_URL` | `jdbc:mysql://localhost:3306/progressgrid_db?...` | |
-| `DB_USERNAME` | `pg_user` | |
-| `DB_PASSWORD` | `password123` | The local dev password from `database_setup.sql`. Change it anywhere real. |
-| `JWT_SECRET` | *(unset)* | **Set this in production.** Unset means a random key is generated at startup, so every token dies on restart. Must be at least 64 characters (HS512). |
-| `JWT_EXPIRATION_MS` | `86400000` (24h) | |
-
-## API
-
-All endpoints except `/api/auth/**` require `Authorization: Bearer <token>`.
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/auth/register` | Create an account (`name`, `email`, `password`) |
-| `POST` | `/api/auth/login` | Exchange credentials for a JWT (`accessToken`) |
-| `GET` | `/api/activities` | List your activities |
-| `POST` | `/api/activities` | Create one (`activityName`, `description`, `frequency`) |
-| `PUT` | `/api/activities/{id}` | Update one |
-| `DELETE` | `/api/activities/{id}` | Delete one, and its completion history |
-| `GET` | `/api/activities/completions?start=&end=` | Ticks in a date range, for the grid |
-| `POST` | `/api/activities/{id}/complete?date=` | Tick a day (defaults to today) |
-| `POST` | `/api/activities/{id}/uncomplete?date=` | Untick a day |
-| `GET` | `/api/progress/daily` | Today's completion |
-| `GET` | `/api/progress/weekly` | This week, plus a per-weekday breakdown |
-| `GET` | `/api/progress/monthly` | This month to date |
-| `GET` | `/api/notifications` | Your notifications, newest first |
-| `PUT` | `/api/notifications/{id}/read` | Mark one read |
-
-Dates are ISO `yyyy-MM-dd`. Weeks run Monday to Sunday.
-
-### How progress is calculated
-
-`percentage = completed / planned`, capped at 100. What counts as *planned* depends on cadence:
-
-- **Daily** — planned is your `DAILY` activity count. Weekly activities are not due on any
-  particular day, so they are excluded from the daily score.
-- **Weekly** — planned is `daily activities × days elapsed this week + weekly activities`.
-- **Monthly** — planned is `daily activities × days elapsed + weekly activities × weeks elapsed`.
-
-## Project layout
-
-```
-backend/     Spring Boot API - controllers, JPA entities, repositories, JWT security
-database/    MySQL setup script and schema reference
-frontend/    index.html plus css/ and js/ - open it directly, no build
-```
-
-## Tests
-
-```bash
-cd backend && ./mvnw test
-```
-
-13 API tests run against in-memory H2, so no local MySQL is needed. They cover the auth
-flow, per-user isolation, grid persistence, cadence-aware progress maths, and notifications.
+1. Ensure the Spring Boot backend is running.
+2. Simply double-click `index.html` to open it in your default web browser! No local server or Node.js environment is required for the frontend.
