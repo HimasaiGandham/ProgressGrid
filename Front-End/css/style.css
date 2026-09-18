@@ -1,0 +1,60 @@
+/* style.css - Global Styles and Variables */
+
+:root {
+    /* Color Palette */
+    --primary-color: #4F46E5; /* Indigo */
+    --primary-hover: #4338CA;
+    --bg-color: #F3F4F6; /* Light gray background */
+    --surface-color: #FFFFFF; /* Card background */
+    --text-main: #111827; /* Dark text */
+    --text-muted: #6B7280; /* Gray text */
+    --success-color: #10B981; /* Emerald */
+    --danger-color: #EF4444; /* Red */
+    --border-color: #E5E7EB;
+    
+    /* Typography */
+    --font-family: 'Inter', sans-serif;
+    
+    /* Shadows & Radii */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    line-height: 1.5;
+}
+
+/* Visibility classes */
+.hidden {
+    display: none !important;
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.text-muted {
+    color: var(--text-muted);
+}

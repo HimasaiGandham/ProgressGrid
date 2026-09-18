@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProgressGrid - Track Your Progress</title>
+    
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- AUTHENTICATION VIEW -->
+    <div id="auth-view" class="view-container">
+        <div class="auth-card">
+            <h1 class="logo-text">ProgressGrid</h1>
+            <p class="auth-subtitle">Track Your Progress. Improve Every Day.</p>
+            
+            <div id="login-form-container">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <div class="error-message" id="login-error"></div>
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                </form>
+                <p class="auth-switch">Don't have an account? <a href="#" id="show-register">Register here</a></p>
+            </div>
+
+            <div id="register-form-container" class="hidden">
+                <h2>Register</h2>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="reg-name">Name</label>
+                        <input type="text" id="reg-name" required minlength="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Email</label>
+                        <input type="email" id="reg-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" required minlength="6">
+                    </div>
+                    <div class="error-message" id="reg-error"></div>
+                    <button type="submit" class="btn btn-primary btn-block">Register</button>
+                </form>
+                <p class="auth-switch">Already have an account? <a href="#" id="show-login">Login here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP VIEW -->
+    <div id="app-view" class="view-container hidden">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="logo-text-small">ProgressGrid</h1>
+            </div>
+            <nav class="main-nav">
+                <a href="#" class="nav-link active" data-target="dashboard-section">Dashboard</a>
+                <a href="#" class="nav-link" data-target="activities-section">Activities</a>
+                <a href="#" class="nav-link" data-target="progress-section">Progress</a>
+                <a href="#" class="nav-link" data-target="notifications-section">Notifications</a>
+            </nav>
+            <div class="header-right">
+                <button id="logout-btn" class="btn btn-outline">Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+            
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section active">
+                <div class="welcome-banner">
+                    <h2 id="welcome-text">Welcome back!</h2>
+                    <p id="today-date"></p>
+                </div>
+                
+                <div class="dashboard-grid">
+                    
+                    <div class="card daily-card">
+                        <h3>Daily Progress</h3>
+                        <div class="circular-progress-container">
+                            <canvas id="dailyChart"></canvas>
+                            <div class="chart-center-text" id="daily-percentage-text">0%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card weekly-card">
+                        <h3>Weekly Progress</h3>
+                        <div class="bar-chart-container">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card activity-grid-card full-width">
+                        <div class="card-header">
+                            <h3>Activity Grid</h3>
+                            <button class="btn btn-sm btn-primary" id="btn-add-activity-dash">+ Add</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="activity-table" id="activity-grid-table">
+                                <thead>
+                                    <tr>
+                                        <th>Activity</th>
+                                        <th>Mon</th>
+                                        <th>Tue</th>
+                                        <th>Wed</th>
+                                        <th>Thu</th>
+                                        <th>Fri</th>
+                                        <th>Sat</th>
+                                        <th>Sun</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                            <div id="empty-activities-dash" class="empty-state hidden">
+                                <p>No activities added yet.</p>
+                                <button class="btn btn-primary" onclick="document.getElementById('btn-add-activity-dash').click()">+ Add Activity</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card notifications-card">
+                        <h3>Recent Notifications</h3>
+                        <ul class="notification-list" id="dash-notifications">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+
+                    <div class="card monthly-card">
+                        <h3>Monthly Progress</h3>
+                        <div class="monthly-progress-bar-container">
+                            <div class="monthly-percentage" id="monthly-percentage-text">0%</div>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="monthly-progress-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+
+            <!-- Activities Section -->
+            <section id="activities-section" class="content-section hidden">
+                <div class="section-header">
+                    <h2>Manage Activities</h2>
+                    <button class="btn btn-primary" id="btn-new-activity">Add New Activity</button>
+                </div>
+                
+                <div class="card">
+                    <ul class="activity-manage-list" id="manage-activity-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Progress Section -->
+            <section id="progress-section" class="content-section hidden">
+                <h2>Detailed Progress</h2>
+                <div class="progress-page-grid">
+                    <div class="card">
+                        <h3>Daily Details</h3>
+                        <p>Completed: <span id="prog-daily-comp">0</span> / <span id="prog-daily-plan">0</span></p>
+                    </div>
+                    <div class="card">
+                        <h3>Weekly Details</h3>
+                        <p>Average: <span id="prog-weekly-avg">0%</span></p>
+                    </div>
+                    <div class="card">
+                        <h3>Monthly Details</h3>
+                        <p>Total Completed: <span id="prog-monthly-comp">0</span></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notifications Section -->
+            <section id="notifications-section" class="content-section hidden">
+                <h2>Notifications</h2>
+                <div class="card">
+                    <ul class="notification-list full-list" id="full-notifications-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+            </section>
+            
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="activity-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3 id="modal-title">Add New Activity</h3>
+            <form id="activity-form">
+                <input type="hidden" id="act-id">
+                <div class="form-group">
+                    <label for="act-name">Activity Name</label>
+                    <input type="text" id="act-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="act-desc">Description</label>
+                    <textarea id="act-desc" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="act-freq">Frequency</label>
+                    <select id="act-freq">
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Activity</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
