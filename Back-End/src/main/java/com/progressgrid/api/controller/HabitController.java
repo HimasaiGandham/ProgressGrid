@@ -13,7 +13,6 @@ import java.util.List;
 /** Every endpoint acts as the signed-in user from the session token; see {@link AuthConfig}. */
 @RestController
 @RequestMapping("/api/habits")
-@CrossOrigin(origins = "*") // Allow frontend to call during dev
 public class HabitController {
 
     @Autowired
