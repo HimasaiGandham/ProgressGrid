@@ -109,9 +109,22 @@
 
                 <!-- RIGHT PANELS -->
                 <aside class="right-panels">
-                    <section class="card">
-                        <h2>Weekly Progress Graph</h2>
-                        <canvas id="weeklyChart"></canvas>
+                    <section class="card weekly-chart-card">
+                        <div class="chart-header-row">
+                            <h2>Weekly Progress Graph</h2>
+                            <span id="weeklyAvgBadge" class="chart-avg-badge">0% Avg</span>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                        <div class="chart-legend-row">
+                            <span class="legend-pill" style="--pill-color: #10b981;"><span class="pill-dot"></span>100% Done</span>
+                            <span class="legend-pill" style="--pill-color: #84cc16;"><span class="pill-dot"></span>75%</span>
+                            <span class="legend-pill" style="--pill-color: #f59e0b;"><span class="pill-dot"></span>50%</span>
+                            <span class="legend-pill" style="--pill-color: #f97316;"><span class="pill-dot"></span>25%</span>
+                            <span class="legend-pill" style="--pill-color: #ef4444;"><span class="pill-dot"></span>&lt;25%</span>
+                            <span class="legend-pill" style="--pill-color: #94a3b8;"><span class="pill-dot"></span>0%</span>
+                        </div>
                     </section>
 
                     <section class="card today-habits-card">

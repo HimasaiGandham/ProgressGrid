@@ -679,26 +679,65 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('topHabitsList').innerHTML = html || '<p>No data yet.</p>';
     }
 
+    // Color mapping for weekly progress graph based on completion percentage tiers
+    function getWeeklyProgressColor(pct) {
+        if (pct >= 100) return { bg: 'rgba(16, 185, 129, 0.85)', border: '#059669', hover: '#047857' }; // 100% Done: Vibrant Emerald Green
+        if (pct >= 75)  return { bg: 'rgba(132, 204, 22, 0.85)',  border: '#65a30d', hover: '#4d7c0f' }; // 75%+: Fresh Lime Green
+        if (pct >= 50)  return { bg: 'rgba(245, 158, 11, 0.85)',  border: '#d97706', hover: '#b45309' }; // 50%+: Warm Amber Gold
+        if (pct >= 25)  return { bg: 'rgba(249, 115, 22, 0.85)',  border: '#ea580c', hover: '#c2410c' }; // 25%+: Vibrant Orange
+        if (pct > 0)    return { bg: 'rgba(239, 68, 68, 0.85)',   border: '#dc2626', hover: '#b91c1c' }; // <25%: Soft Crimson / Red
+        return { bg: 'rgba(203, 213, 225, 0.35)', border: 'rgba(148, 163, 184, 0.5)', hover: 'rgba(148, 163, 184, 0.6)' }; // 0%: Subtle Slate
+    }
+
     function renderChart() {
-        const ctx = document.getElementById('weeklyChart').getContext('2d');
+        const canvas = document.getElementById('weeklyChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
         
         const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const dataPoints = [0,0,0,0,0,0,0];
+        const dataPoints = [0, 0, 0, 0, 0, 0, 0];
+        const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+        const totalHabits = habits.length;
         
-        if(habits.length > 0) {
+        if (habits.length > 0) {
             let d = new Date(currentWeekStart);
-            for(let i=0; i<7; i++) {
+            for (let i = 0; i < 7; i++) {
                 let dayDone = 0;
+                const iso = formatDateIso(d);
                 habits.forEach(h => {
-                    if(h.completionsSet.has(formatDateIso(d))) dayDone++;
+                    if (h.completionsSet && h.completionsSet.has(iso)) dayDone++;
                 });
+                dayCounts[i] = dayDone;
                 dataPoints[i] = Math.round((dayDone / habits.length) * 100);
                 d.setDate(d.getDate() + 1);
             }
         }
 
-        if(weeklyChartInstance) {
+        const bgColors = dataPoints.map(p => getWeeklyProgressColor(p).bg);
+        const borderColors = dataPoints.map(p => getWeeklyProgressColor(p).border);
+        const hoverColors = dataPoints.map(p => getWeeklyProgressColor(p).hover);
+
+        // Update Average Badge
+        const avgPct = dataPoints.length > 0 
+            ? Math.round(dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length) 
+            : 0;
+        const avgBadge = document.getElementById('weeklyAvgBadge');
+        if (avgBadge) {
+            const avgColor = getWeeklyProgressColor(avgPct);
+            avgBadge.innerText = `${avgPct}% Avg`;
+            avgBadge.style.backgroundColor = avgColor.bg.replace('0.85', '0.15');
+            avgBadge.style.color = avgColor.border;
+            avgBadge.style.borderColor = avgColor.border;
+        }
+
+        if (weeklyChartInstance) {
+            weeklyChartInstance.dayCounts = dayCounts;
+            weeklyChartInstance.totalHabits = totalHabits;
+            weeklyChartInstance.data.labels = labels;
             weeklyChartInstance.data.datasets[0].data = dataPoints;
+            weeklyChartInstance.data.datasets[0].backgroundColor = bgColors;
+            weeklyChartInstance.data.datasets[0].borderColor = borderColors;
+            weeklyChartInstance.data.datasets[0].hoverBackgroundColor = hoverColors;
             weeklyChartInstance.update();
         } else {
             weeklyChartInstance = new Chart(ctx, {
@@ -708,17 +747,87 @@ document.addEventListener('DOMContentLoaded', () => {
                     datasets: [{
                         label: 'Completion %',
                         data: dataPoints,
-                        backgroundColor: '#4CAF50',
-                        borderRadius: 4
+                        backgroundColor: bgColors,
+                        borderColor: borderColors,
+                        hoverBackgroundColor: hoverColors,
+                        borderWidth: 2,
+                        borderRadius: 6,
+                        borderSkipped: false
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 400
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                            titleColor: '#f8fafc',
+                            titleFont: { family: "'Inter', sans-serif", weight: '600', size: 13 },
+                            bodyColor: '#e2e8f0',
+                            bodyFont: { family: "'Inter', sans-serif", size: 12 },
+                            padding: 12,
+                            boxPadding: 6,
+                            cornerRadius: 8,
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const pct = context.parsed.y;
+                                    const counts = (weeklyChartInstance && weeklyChartInstance.dayCounts) || dayCounts;
+                                    const total = (weeklyChartInstance && weeklyChartInstance.totalHabits) || totalHabits;
+                                    const done = counts[index] || 0;
+                                    
+                                    if (pct >= 100) return ` ${pct}% Complete (${done}/${total}) — 100% Done! 🎉`;
+                                    if (pct >= 75)  return ` ${pct}% Complete (${done}/${total}) — Almost done! 🌟`;
+                                    if (pct >= 50)  return ` ${pct}% Complete (${done}/${total}) — 50%+ Halfway! ⚡`;
+                                    if (pct >= 25)  return ` ${pct}% Complete (${done}/${total}) — 25%+ Progress! 💪`;
+                                    if (pct > 0)    return ` ${pct}% Complete (${done}/${total}) — Started 🔥`;
+                                    return ` 0% Complete (${done}/${total}) — No habits done`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: true, max: 100 }
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                stepSize: 25,
+                                callback: function(val) { return val + '%'; },
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 11
+                                },
+                                color: '#94a3b8'
+                            },
+                            grid: {
+                                color: 'rgba(226, 232, 240, 0.6)',
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 12,
+                                    weight: '600'
+                                },
+                                color: '#475569'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
                     }
                 }
             });
+            weeklyChartInstance.dayCounts = dayCounts;
+            weeklyChartInstance.totalHabits = totalHabits;
         }
     }
 
