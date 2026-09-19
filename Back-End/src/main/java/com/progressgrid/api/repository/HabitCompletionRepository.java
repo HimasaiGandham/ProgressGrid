@@ -12,6 +12,4 @@ import java.util.Optional;
 public interface HabitCompletionRepository extends JpaRepository<HabitCompletion, Long> {
     List<HabitCompletion> findByHabitId(Long habitId);
     Optional<HabitCompletion> findByHabitIdAndCompletionDate(Long habitId, LocalDate date);
-    
-    List<HabitCompletion> findByHabitIdAndCompletionDateBetween(Long habitId, LocalDate startDate, LocalDate endDate);
 }
