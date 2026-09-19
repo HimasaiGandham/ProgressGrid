@@ -1,5 +1,17 @@
 const API_URL = `${window.location.origin}/api/auth`;
 
+// Read an error body exactly once. Calling res.json() and then res.text() on the same response
+// throws, and that throw used to land in the offline fallback below - signing people in with a
+// wrong password, or telling them a failed signup had worked.
+async function readError(res, fallback) {
+    const text = await res.text().catch(() => '');
+    try {
+        return JSON.parse(text).message || fallback;
+    } catch (e) {
+        return text || fallback;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Handle logout or clean test parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -367,11 +379,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('userId', data.id || 1);
                 localStorage.setItem('username', data.username || username);
                 if (data.email) localStorage.setItem('email', data.email);
+                if (data.token) localStorage.setItem('progressgrid_token', data.token);
                 window.location.href = 'index.html';
             } else {
-                const errorData = await res.json().catch(() => null);
-                const errorText = errorData ? (errorData.message || errorData) : await res.text();
-                loginError.innerText = errorText || 'Invalid credentials';
+                loginError.innerText = await readError(res, 'Invalid credentials');
             }
         } catch (err) {
             // Testing fallback
@@ -416,9 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     signupError.style.color = '';
                 }, 700);
             } else {
-                const errorData = await res.json().catch(() => null);
-                const errorText = errorData ? (errorData.message || errorData) : await res.text();
-                signupError.innerText = errorText || 'Signup failed';
+                signupError.innerText = await readError(res, 'Signup failed');
             }
         } catch (err) {
             signupError.innerText = 'Account ready! Switching to sign in...';
