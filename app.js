@@ -1,25 +1,16 @@
 const API_URL = `${window.location.origin}/api/habits`;
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Auth Check
-    const rawUserId = localStorage.getItem('userId');
-    const username = localStorage.getItem('username') || 'User';
-    if (!rawUserId) {
+
+    // Signed in means holding a session token. Without one, go to the sign-in page.
+    if (!localStorage.getItem('progressgrid_token')) {
         window.location.href = 'login.html';
         return;
-    }
-    // A missing or expired session: sign in again instead of silently showing cached data.
-    // The backend identifies the user from the session token, so no user id is sent any more.
-    function handleUnauthorized(res) {
-        if (res.status !== 401) return false;
-        localStorage.clear();
-        window.location.href = 'login.html';
-        return true;
     }
 
     // State
     let habits = [];
+    let loadFailed = false;
     let currentWeekStart = getMonday(new Date());
 
     // DOM Elements
@@ -32,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addHabitForm = document.getElementById('addHabitForm');
     const prevWeekBtn = document.getElementById('prevWeekBtn');
     const nextWeekBtn = document.getElementById('nextWeekBtn');
-    
+
     // Tabs & Profile Elements
     const dashboardView = document.getElementById('dashboardView');
     const profileView = document.getElementById('profileView');
@@ -58,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileMobileInput = document.getElementById('profileMobileInput');
     const profileAlertMsg = document.getElementById('profileAlertMsg');
     const clearFieldsBtn = document.getElementById('clearFieldsBtn');
-    
+
     // Chart
     let weeklyChartInstance = null;
 
@@ -69,6 +60,24 @@ document.addEventListener('DOMContentLoaded', () => {
         initProfileData();
         attachEventListeners();
         fetchHabits();
+    }
+
+    // One place for the session token, the request timeout and what a 401 means.
+    async function api(path, options = {}) {
+        const res = await fetch(API_URL + path, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('progressgrid_token')
+            },
+            signal: AbortSignal.timeout(8000)
+        });
+        if (res.status === 401) {
+            // Missing or expired session: sign in again.
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+        return res;
     }
 
     function initProfileData() {
@@ -133,69 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Local storage helpers for offline resilience. They live at this level rather than inside
-    // attachEventListeners() because renderGrid() and fetchHabits() call them too; nested there,
-    // ticking a habit threw a ReferenceError before the change ever reached the server.
-    function getStoredHabits() {
-        const stored = localStorage.getItem('pg_local_habits');
-        if (stored) {
-            try { return JSON.parse(stored); } catch(e) {}
-        }
-        const today = new Date();
-        const d0 = formatDateIso(today);
-        const d1 = formatDateIso(new Date(Date.now() - 86400000));
-        const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
-        const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
-        const defaults = [
-            {
-                id: 101,
-                name: 'Morning Workout & Stretch',
-                category: 'Health',
-                frequency: 'DAILY',
-                currentStreak: 3,
-                bestStreak: 7,
-                completionPercentage: 85,
-                completions: [d0, d1, d2]
-            },
-            {
-                id: 102,
-                name: 'Read 20 Pages',
-                category: 'Productivity',
-                frequency: 'DAILY',
-                currentStreak: 4,
-                bestStreak: 12,
-                completionPercentage: 90,
-                completions: [d0, d1, d2, d3]
-            },
-            {
-                id: 103,
-                name: 'Drink 2.5L Water',
-                category: 'Health',
-                frequency: 'DAILY',
-                currentStreak: 2,
-                bestStreak: 6,
-                completionPercentage: 70,
-                completions: [d0, d1]
-            },
-            {
-                id: 104,
-                name: 'Weekly Planning & Review',
-                category: 'Work',
-                frequency: 'WEEKLY',
-                currentStreak: 1,
-                bestStreak: 4,
-                completionPercentage: 100,
-                completions: [d0]
-            }
-        ];
-        saveStoredHabits(defaults);
-        return defaults;
-    }
-
-    function saveStoredHabits(data) {
-        localStorage.setItem('pg_local_habits', JSON.stringify(data));
-    }
-
     function attachEventListeners() {
         // Tab Navigation
         function showDashboard() {
@@ -236,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Other Nav links
+        // Other Nav links (their pages don't exist yet, so they show the dashboard)
         ['navHabits', 'navStats', 'navCalendar'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -346,82 +292,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Modal
         addHabitBtn.addEventListener('click', () => {
-            const startDateInput = document.getElementById('habitStartDate');
-            if (startDateInput) {
-                startDateInput.value = formatDateIso(new Date());
-            }
+            document.getElementById('habitStartDate').value = formatDateIso(new Date());
             addHabitModal.classList.add('active');
         });
         closeHabitModal.addEventListener('click', () => addHabitModal.classList.remove('active'));
         cancelHabitBtn.addEventListener('click', () => addHabitModal.classList.remove('active'));
-        
+
         // Form
         addHabitForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const habitName = document.getElementById('habitName').value.trim();
-            const habitCat = document.getElementById('habitCategory').value;
-            const habitFreq = document.getElementById('habitFrequency').value;
-            const startDateInput = document.getElementById('habitStartDate');
-            const habitStartDate = (startDateInput && startDateInput.value) ? startDateInput.value : formatDateIso(new Date());
-
-            if (!habitName) return;
-
-            const newHabit = {
-                name: habitName,
-                category: habitCat,
-                frequency: habitFreq,
-                startDate: habitStartDate
+            const habit = {
+                name: document.getElementById('habitName').value.trim(),
+                category: document.getElementById('habitCategory').value,
+                frequency: document.getElementById('habitFrequency').value,
+                startDate: document.getElementById('habitStartDate').value || formatDateIso(new Date())
             };
+            if (!habit.name) return;
 
-            let savedOnBackend = false;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const token = localStorage.getItem('progressgrid_token');
-                const headers = { 
-                    'Content-Type': 'application/json'
-                };
-                if (token) headers['Authorization'] = 'Bearer ' + token;
-
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(newHabit),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (handleUnauthorized(res)) return;
-                if(res.ok) {
-                    savedOnBackend = true;
-                    const serverHabit = await res.json();
-                    if (serverHabit && serverHabit.id) {
-                        newHabit.id = serverHabit.id;
-                        if (serverHabit.startDate) newHabit.startDate = serverHabit.startDate;
-                    }
-                }
-            } catch(e) {
-                // Backend offline - gracefully fallback to local
+            const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
+            if (!res || !res.ok) {
+                alert("Couldn't save the habit. Check that the backend is running and try again.");
+                return;
             }
-
-            // Always ensure habit is added and rendered immediately
-            const currentList = getStoredHabits();
-            const created = {
-                id: newHabit.id || Date.now(),
-                name: newHabit.name,
-                category: newHabit.category,
-                frequency: newHabit.frequency,
-                startDate: newHabit.startDate || habitStartDate,
-                currentStreak: 0,
-                bestStreak: 0,
-                completionPercentage: 0,
-                completions: []
-            };
-            currentList.push(created);
-            saveStoredHabits(currentList);
-            
             addHabitForm.reset();
-            if (startDateInput) startDateInput.value = formatDateIso(new Date());
             addHabitModal.classList.remove('active');
+            fetchHabits();
+        });
+
+        // Ticking a day: one listener on the table instead of one per cell on every render.
+        habitTableBody.addEventListener('click', async (e) => {
+            const cell = e.target.closest('td[data-habit]');
+            if (!cell) return;
+            const habit = habits.find(h => h.id === Number(cell.dataset.habit));
+            const date = cell.dataset.date;
+            const completed = !habit.completionsSet.has(date);
+
+            // Show the tick straight away, then reload: streaks and percentages are worked out on
+            // the server, and reloading also puts the box back if saving failed.
+            if (completed) habit.completionsSet.add(date);
+            else habit.completionsSet.delete(date);
+            renderDashboard();
+            await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
             fetchHabits();
         });
 
@@ -437,39 +348,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchHabits() {
-        let loadedFromServer = false;
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1200);
-            const token = localStorage.getItem('progressgrid_token');
-            const headers = {};
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-
-            const res = await fetch(API_URL, {
-                headers: headers,
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            if (handleUnauthorized(res)) return;
-            if (res.ok) {
-                habits = await res.json();
-                loadedFromServer = true;
-                saveStoredHabits(habits);
-            }
-        } catch(e) {
-            // Backend offline - seamlessly use local storage
+            const res = await api('');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            habits = await res.json();
+            loadFailed = false;
+        } catch (e) {
+            habits = [];
+            loadFailed = true;
         }
 
-        if (!loadedFromServer) {
-            habits = getStoredHabits();
-        }
-
-        // Format dates and ensure startDate is present
         habits.forEach(h => {
             h.completionsSet = new Set(h.completions || []);
-            if (!h.startDate) {
-                h.startDate = formatDateIso(new Date());
-            }
+            h.start = String(h.startDate || formatDateIso(new Date())).split('T')[0];
         });
         renderDashboard();
     }
@@ -486,197 +377,121 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateDateHeaders() {
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         document.getElementById('currentDateDisplay').innerText = `${monthNames[currentWeekStart.getMonth()]} ${currentWeekStart.getFullYear()}`;
-        
+
         const endOfWeek = new Date(currentWeekStart);
         endOfWeek.setDate(endOfWeek.getDate() + 6);
         document.getElementById('currentWeekLabel').innerText = `${formatShortDate(currentWeekStart)} - ${formatShortDate(endOfWeek)}`;
     }
 
     function renderGrid() {
-        // Headers
+        const days = weekDates(currentWeekStart);
+        const today = formatDateIso(new Date());
         const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        let headerHtml = `<th>Habit</th>`;
-        
-        let loopDate = new Date(currentWeekStart);
-        for(let i=0; i<7; i++) {
-            headerHtml += `<th>${dayNames[i]}<br><small>${loopDate.getDate()}</small></th>`;
-            loopDate.setDate(loopDate.getDate() + 1);
-        }
-        dayHeaderRow.innerHTML = headerHtml;
+        dayHeaderRow.innerHTML = '<th>Habit</th>' + days.map((iso, i) => `<th>${dayNames[i]}<br><small>${Number(iso.slice(8))}</small></th>`).join('');
 
-        // Body
-        let tbodyHtml = '';
-        if(habits.length === 0) {
-            tbodyHtml = `<tr><td colspan="8" style="text-align:center; padding: 20px;">No habits yet. Add one above!</td></tr>`;
+        if (habits.length === 0) {
+            const message = loadFailed
+                ? "Couldn't load your habits. Check that the backend is running, then refresh."
+                : 'No habits yet. Add one above!';
+            habitTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;">${message}</td></tr>`;
+            return;
         }
 
-        habits.forEach(habit => {
-            let habitStartDate = '';
-            if (habit.startDate) {
-                habitStartDate = typeof habit.startDate === 'string' ? habit.startDate.split('T')[0] : formatDateIso(new Date(habit.startDate));
-            } else if (habit.createdAt) {
-                habitStartDate = typeof habit.createdAt === 'string' ? habit.createdAt.split('T')[0] : formatDateIso(new Date(habit.createdAt));
-            } else {
-                habitStartDate = formatDateIso(new Date());
-            }
+        habitTableBody.innerHTML = habits.map(habit => {
+            const startLabel = formatShortDate(new Date(habit.start + 'T00:00:00'));
+            const cells = days.map(iso => {
+                if (iso < habit.start) {
+                    return `<td class="check-cell not-started" title="Habit starts on ${startLabel}"><span class="not-started-dash" aria-label="Not started yet">—</span></td>`;
+                }
+                if (iso > today) {
+                    return `<td class="check-cell not-started" title="Can't tick a day that hasn't happened yet"></td>`;
+                }
+                const checked = habit.completionsSet.has(iso) ? 'checked' : '';
+                return `<td class="check-cell ${checked}" data-habit="${habit.id}" data-date="${iso}" title="${iso}"><div class="check-box-inner"></div></td>`;
+            }).join('');
 
-            let rowHtml = `<tr class="habit-row">
+            return `<tr class="habit-row">
                 <td class="habit-name">
-                    <strong>${habit.name}</strong><br>
-                    <small style="color:var(--text-muted)">${habit.category} • From ${formatShortDate(new Date(habitStartDate + 'T00:00:00'))}</small>
-                </td>`;
-            
-            let d = new Date(currentWeekStart);
-            for (let i = 0; i < 7; i++) {
-                const dateStr = formatDateIso(d);
-                const isBeforeStart = dateStr < habitStartDate;
-
-                if (isBeforeStart) {
-                    // Habit has not started yet before this date: show subtle inactive indicator, no box
-                    rowHtml += `
-                        <td class="check-cell not-started" title="Habit starts on ${formatShortDate(new Date(habitStartDate + 'T00:00:00'))}">
-                            <span class="not-started-dash" aria-label="Not started yet">—</span>
-                        </td>`;
-                } else {
-                    // Habit is active starting from this date: show interactive check box
-                    const isChecked = habit.completionsSet.has(dateStr);
-                    rowHtml += `
-                        <td class="check-cell ${isChecked ? 'checked' : ''}" data-habit="${habit.id}" data-date="${dateStr}" title="${dateStr}">
-                            <div class="check-box-inner"></div>
-                        </td>`;
-                }
-                d.setDate(d.getDate() + 1);
-            }
-            rowHtml += `</tr>`;
-            tbodyHtml += rowHtml;
-        });
-
-        habitTableBody.innerHTML = tbodyHtml;
-
-        // Attach clicks only to active habit cells (excluding not-started days)
-        document.querySelectorAll('.check-cell:not(.not-started)').forEach(cell => {
-            cell.addEventListener('click', async (e) => {
-                const td = e.target.closest('.check-cell');
-                if (!td || td.classList.contains('not-started')) return;
-                const habitId = parseInt(td.dataset.habit);
-                const dateStr = td.dataset.date;
-                if (!habitId || !dateStr) return;
-                const habit = habits.find(h => h.id === habitId);
-                if (!habit) return;
-                
-                const isCompleted = !habit.completionsSet.has(dateStr);
-                
-                // Optimistic UI
-                if(isCompleted) habit.completionsSet.add(dateStr);
-                else habit.completionsSet.delete(dateStr);
-                
-                renderDashboard();
-
-                // Persist locally
-                habit.completions = Array.from(habit.completionsSet);
-                const storedList = getStoredHabits();
-                const matched = storedList.find(item => item.id === habitId);
-                if (matched) {
-                    matched.completions = habit.completions;
-                    saveStoredHabits(storedList);
-                }
-
-                // API sync if available
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 1200);
-                    const token = localStorage.getItem('progressgrid_token');
-                    const headers = { 
-                        'Content-Type': 'application/json'
-                    };
-                    if (token) headers['Authorization'] = 'Bearer ' + token;
-
-                    const res = await fetch(`${API_URL}/${habitId}/complete`, {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify({ date: dateStr, completed: isCompleted }),
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    handleUnauthorized(res);
-                } catch(err) {
-                    // Offline - state already persisted locally
-                }
-            });
-        });
+                    <strong>${esc(habit.name)}</strong><br>
+                    <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
+                </td>${cells}</tr>`;
+        }).join('');
     }
 
     function renderSummaries() {
-        document.getElementById('sumTotalHabits').innerText = habits.length;
-        
-        let totalCurrentStreak = habits.reduce((acc, h) => acc + (h.currentStreak || 0), 0);
-        let bestOverallStreak = Math.max(0, ...habits.map(h => h.bestStreak || 0));
-        
-        document.getElementById('sumCurrentStreak').innerText = `${totalCurrentStreak} days`;
-        document.getElementById('sumBestStreak').innerText = `${bestOverallStreak} days`;
+        const days = weekDates(currentWeekStart);
+        const today = formatDateIso(new Date());
 
-        // Calculate Weekly Progress only for active days (from start date onwards)
-        let totalChecksThisWeek = 0;
-        let possibleChecks = 0;
-        
+        document.getElementById('sumTotalHabits').innerText = habits.length;
+        document.getElementById('sumCurrentStreak').innerText = longestStreak('currentStreak');
+        document.getElementById('sumBestStreak').innerText = longestStreak('bestStreak');
+
+        // This week so far: a daily habit can be done once for each day since it started,
+        // a weekly habit once for the whole week.
+        let done = 0;
+        let possible = 0;
         habits.forEach(h => {
-            const hStart = h.startDate ? (typeof h.startDate === 'string' ? h.startDate.split('T')[0] : formatDateIso(new Date(h.startDate))) : '';
-            let d = new Date(currentWeekStart);
-            for(let i=0; i<7; i++) {
-                const dateStr = formatDateIso(d);
-                if (!hStart || dateStr >= hStart) {
-                    possibleChecks++;
-                    if(h.completionsSet.has(dateStr)) totalChecksThisWeek++;
-                }
-                d.setDate(d.getDate() + 1);
+            if (isWeekly(h)) {
+                if (h.start > days[6] || days[0] > today) return;
+                possible++;
+                if (days.some(d => h.completionsSet.has(d))) done++;
+            } else {
+                days.filter(d => d >= h.start && d <= today).forEach(d => {
+                    possible++;
+                    if (h.completionsSet.has(d)) done++;
+                });
             }
         });
+        document.getElementById('sumWeeklyProgress').innerText = `${possible ? Math.round(done * 100 / possible) : 0}%`;
 
-        let weeklyPercent = possibleChecks === 0 ? 0 : Math.round((totalChecksThisWeek / possibleChecks) * 100);
-        document.getElementById('sumWeeklyProgress').innerText = `${weeklyPercent}%`;
-        
-        // Monthly simply average of all habits completion percentage from backend
-        let totalMonthly = habits.reduce((acc, h) => acc + (h.completionPercentage || 0), 0);
-        let monthlyAvg = habits.length === 0 ? 0 : Math.round(totalMonthly / habits.length);
-        document.getElementById('sumMonthlyProgress').innerText = `${monthlyAvg}%`;
+        // Average of each habit's completion since its start date, worked out on the server.
+        const overall = habits.length
+            ? Math.round(habits.reduce((sum, h) => sum + (h.completionPercentage || 0), 0) / habits.length)
+            : 0;
+        document.getElementById('sumMonthlyProgress').innerText = `${overall}%`;
+    }
+
+    // The longest current or best streak across all habits, in that habit's own unit.
+    function longestStreak(field) {
+        const top = habits.reduce((best, h) => ((h[field] || 0) > (best ? best[field] || 0 : 0) ? h : best), null);
+        return top ? streakText(top, top[field]) : '0 days';
+    }
+
+    function streakText(habit, n) {
+        const unit = isWeekly(habit) ? 'week' : 'day';
+        return `${n} ${unit}${n === 1 ? '' : 's'}`;
     }
 
     function renderTodayHabits() {
-        const todayIso = formatDateIso(new Date());
-        let html = '';
-        
-        if(habits.length === 0) html = `<p class="text-muted">No habits scheduled.</p>`;
-        
-        habits.forEach(h => {
-            const isDone = h.completionsSet.has(todayIso);
-            html += `
-                <div class="today-habit-item ${isDone ? 'completed' : ''}">
+        const today = formatDateIso(new Date());
+        const thisWeek = weekDates(getMonday(new Date()));
+
+        const html = habits.filter(h => h.start <= today).map(h => {
+            const weekly = isWeekly(h);
+            const done = weekly ? thisWeek.some(d => h.completionsSet.has(d)) : h.completionsSet.has(today);
+            const status = done ? (weekly ? '✓ Done this week' : '✓ Done') : (weekly ? 'This week' : 'Pending');
+            return `
+                <div class="today-habit-item ${done ? 'completed' : ''}">
                     <div class="habit-title">
                         <span style="display:inline-block; width:10px; height:10px; background:var(--primary-color); border-radius:50%; margin-right:8px;"></span>
-                        ${h.name}
+                        ${esc(h.name)}
                     </div>
-                    <div class="habit-status">${isDone ? '✓ Done' : 'Pending'}</div>
-                </div>
-            `;
-        });
-        document.getElementById('todayHabitsList').innerHTML = html;
+                    <div class="habit-status">${status}</div>
+                </div>`;
+        }).join('');
+        document.getElementById('todayHabitsList').innerHTML = html || '<p class="text-muted">No habits scheduled.</p>';
     }
 
     function renderPerformance() {
-        let sorted = [...habits].sort((a,b) => (b.completionPercentage || 0) - (a.completionPercentage || 0));
-        let html = '';
-        sorted.slice(0, 5).forEach(h => {
-            html += `
-                <div class="stat-item">
-                    <div class="stat-item-info">
-                        <h4>${h.name}</h4>
-                        <p>Streak: ${h.currentStreak || 0} | Best: ${h.bestStreak || 0}</p>
-                    </div>
-                    <div class="stat-value">${h.completionPercentage || 0}%</div>
+        const top = [...habits].sort((a, b) => (b.completionPercentage || 0) - (a.completionPercentage || 0)).slice(0, 5);
+        document.getElementById('topHabitsList').innerHTML = top.map(h => `
+            <div class="stat-item">
+                <div class="stat-item-info">
+                    <h4>${esc(h.name)}</h4>
+                    <p>Streak: ${streakText(h, h.currentStreak || 0)} | Best: ${streakText(h, h.bestStreak || 0)}</p>
                 </div>
-            `;
-        });
-        document.getElementById('topHabitsList').innerHTML = html || '<p>No data yet.</p>';
+                <div class="stat-value">${h.completionPercentage || 0}%</div>
+            </div>`).join('') || '<p>No data yet.</p>';
     }
 
     // Color mapping for weekly progress graph based on completion percentage tiers
@@ -693,34 +508,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('weeklyChart');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        
+
         const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const dataPoints = [0, 0, 0, 0, 0, 0, 0];
-        const dayCounts = [0, 0, 0, 0, 0, 0, 0];
-        const totalHabits = habits.length;
-        
-        if (habits.length > 0) {
-            let d = new Date(currentWeekStart);
-            for (let i = 0; i < 7; i++) {
-                let dayDone = 0;
-                const iso = formatDateIso(d);
-                habits.forEach(h => {
-                    if (h.completionsSet && h.completionsSet.has(iso)) dayDone++;
-                });
-                dayCounts[i] = dayDone;
-                dataPoints[i] = Math.round((dayDone / habits.length) * 100);
-                d.setDate(d.getDate() + 1);
-            }
-        }
+        const days = weekDates(currentWeekStart);
+        const today = formatDateIso(new Date());
+
+        // Each bar is the share of daily habits (already started) ticked that day. Weekly habits
+        // aren't due on any particular day, so they stay out of the daily bars.
+        const due = days.map(iso => habits.filter(h => !isWeekly(h) && h.start <= iso));
+        const dayCounts = days.map((iso, i) => due[i].filter(h => h.completionsSet.has(iso)).length);
+        const dayTotals = due.map(list => list.length);
+        const dataPoints = dayCounts.map((done, i) => (dayTotals[i] ? Math.round(done * 100 / dayTotals[i]) : 0));
 
         const bgColors = dataPoints.map(p => getWeeklyProgressColor(p).bg);
         const borderColors = dataPoints.map(p => getWeeklyProgressColor(p).border);
         const hoverColors = dataPoints.map(p => getWeeklyProgressColor(p).hover);
 
-        // Update Average Badge
-        const avgPct = dataPoints.length > 0 
-            ? Math.round(dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length) 
-            : 0;
+        // Average Badge: only days that have happened and had something due.
+        const counted = dataPoints.filter((_, i) => days[i] <= today && dayTotals[i] > 0);
+        const avgPct = counted.length ? Math.round(counted.reduce((a, b) => a + b, 0) / counted.length) : 0;
         const avgBadge = document.getElementById('weeklyAvgBadge');
         if (avgBadge) {
             const avgColor = getWeeklyProgressColor(avgPct);
@@ -732,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (weeklyChartInstance) {
             weeklyChartInstance.dayCounts = dayCounts;
-            weeklyChartInstance.totalHabits = totalHabits;
+            weeklyChartInstance.dayTotals = dayTotals;
             weeklyChartInstance.data.labels = labels;
             weeklyChartInstance.data.datasets[0].data = dataPoints;
             weeklyChartInstance.data.datasets[0].backgroundColor = bgColors;
@@ -778,10 +584,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 label: function(context) {
                                     const index = context.dataIndex;
                                     const pct = context.parsed.y;
-                                    const counts = (weeklyChartInstance && weeklyChartInstance.dayCounts) || dayCounts;
-                                    const total = (weeklyChartInstance && weeklyChartInstance.totalHabits) || totalHabits;
-                                    const done = counts[index] || 0;
-                                    
+                                    const done = weeklyChartInstance.dayCounts[index] || 0;
+                                    const total = weeklyChartInstance.dayTotals[index] || 0;
+
                                     if (pct >= 100) return ` ${pct}% Complete (${done}/${total}) — 100% Done! 🎉`;
                                     if (pct >= 75)  return ` ${pct}% Complete (${done}/${total}) — Almost done! 🌟`;
                                     if (pct >= 50)  return ` ${pct}% Complete (${done}/${total}) — 50%+ Halfway! ⚡`;
@@ -827,25 +632,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             weeklyChartInstance.dayCounts = dayCounts;
-            weeklyChartInstance.totalHabits = totalHabits;
+            weeklyChartInstance.dayTotals = dayTotals;
         }
     }
 
     // Utils
+    // Habit names and categories are user input, so escape them before they go into innerHTML.
+    function esc(text) {
+        return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function isWeekly(habit) {
+        return /^weekly$/i.test(habit.frequency || '');
+    }
+
+    // The seven ISO dates of the week starting on the given Monday.
+    function weekDates(monday) {
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(monday);
+            d.setDate(d.getDate() + i);
+            return formatDateIso(d);
+        });
+    }
+
     function getMonday(d) {
         d = new Date(d);
         var day = d.getDay(),
             diff = d.getDate() - day + (day == 0 ? -6:1); // adjust when day is sunday
         return new Date(d.setDate(diff));
     }
-    
+
     function formatDateIso(d) {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
-    
+
     function formatShortDate(d) {
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }

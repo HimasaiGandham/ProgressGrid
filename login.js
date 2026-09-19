@@ -1,8 +1,8 @@
 const API_URL = `${window.location.origin}/api/auth`;
 
 // Read an error body exactly once. Calling res.json() and then res.text() on the same response
-// throws, and that throw used to land in the offline fallback below - signing people in with a
-// wrong password, or telling them a failed signup had worked.
+// throws, and that throw used to land in an old offline fallback that signed people in with a
+// wrong password, or told them a failed signup had worked.
 async function readError(res, fallback) {
     const text = await res.text().catch(() => '');
     try {
@@ -13,9 +13,8 @@ async function readError(res, fallback) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Handle logout or clean test parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('logout') === 'true' || urlParams.get('test') === 'true' || urlParams.get('clean') === 'true') {
+    // Arriving from the logout button: drop the session.
+    if (new URLSearchParams(window.location.search).get('logout') === 'true') {
         localStorage.clear();
     }
 
@@ -363,33 +362,24 @@ document.addEventListener('DOMContentLoaded', () => {
         loginError.style.color = '#e74c3c';
 
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-
             const res = await fetch(`${API_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
-                signal: controller.signal
+                signal: AbortSignal.timeout(6000)
             });
-            clearTimeout(timeoutId);
 
             if (res.ok) {
                 const data = await res.json();
-                localStorage.setItem('userId', data.id || 1);
+                localStorage.setItem('progressgrid_token', data.token);
                 localStorage.setItem('username', data.username || username);
                 if (data.email) localStorage.setItem('email', data.email);
-                if (data.token) localStorage.setItem('progressgrid_token', data.token);
                 window.location.href = 'index.html';
             } else {
                 loginError.innerText = await readError(res, 'Invalid credentials');
             }
         } catch (err) {
-            // Testing fallback
-            console.log('Testing fallback login');
-            localStorage.setItem('userId', 1);
-            localStorage.setItem('username', username || 'User');
-            window.location.href = 'index.html';
+            loginError.innerText = "Can't reach the server. Check that the backend is running.";
         }
     });
 
@@ -405,16 +395,12 @@ document.addEventListener('DOMContentLoaded', () => {
         signupError.style.color = '#e74c3c';
 
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-
             const res = await fetch(`${API_URL}/signup`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, name: username, email, password }),
-                signal: controller.signal
+                signal: AbortSignal.timeout(6000)
             });
-            clearTimeout(timeoutId);
 
             if (res.ok) {
                 signupError.innerText = 'Registration successful! Please sign in.';
@@ -430,15 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 signupError.innerText = await readError(res, 'Signup failed');
             }
         } catch (err) {
-            signupError.innerText = 'Account ready! Switching to sign in...';
-            signupError.style.color = '#10b981';
-            setTimeout(() => {
-                signupForm.classList.remove('active');
-                loginForm.classList.add('active');
-                document.getElementById('loginUsername').value = email || username;
-                signupError.innerText = '';
-                signupError.style.color = '';
-            }, 600);
+            signupError.innerText = "Can't reach the server. Check that the backend is running.";
         }
     });
 });

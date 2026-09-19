@@ -238,13 +238,6 @@ input[type="password"]::-ms-clear,
     margin-bottom: 8px;
 }
 
-.success-msg {
-    color: #10b981;
-    font-size: 13.5px;
-    text-align: center;
-    font-weight: 500;
-}
-
 /* Multi-Step OTP Wizard Styles */
 .steps-progress-bar {
     display: flex;
