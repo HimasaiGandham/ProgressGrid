@@ -8,86 +8,58 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Objects;
 
+/**
+ * Errors come back as JSON {"status": "error", "message": ...}, which login.js and the reset
+ * pop-up read the message from. A failed login is 401; anything else the user got wrong is 400.
+ */
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
     private AuthService authService;
 
-    // Errors are JSON {"message": ...} like the other endpoints here. A bare-string body made
-    // login.js throw while reading it, and that throw fell into its offline fallback, which
-    // signed the visitor in regardless of the password.
-
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDTO loginDTO) {
         try {
-            AuthResponseDTO response = authService.login(loginDTO);
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(authService.login(loginDTO));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
+            return error(HttpStatus.UNAUTHORIZED, e);
         }
     }
 
     @PostMapping({"/signup", "/register"})
-    public ResponseEntity<?> signup(@RequestBody SignupDTO signupDTO) {
-        try {
-            AuthResponseDTO response = authService.signup(signupDTO);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+    public AuthResponseDTO signup(@RequestBody SignupDTO signupDTO) {
+        return authService.signup(signupDTO);
     }
 
     @PostMapping("/forgot-password/send-otp")
-    public ResponseEntity<?> sendOtp(@RequestBody SendOtpDTO dto) {
-        try {
-            String maskedEmail = authService.sendPasswordResetOtp(dto.getIdentifier());
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "message", "Verification code sent to " + maskedEmail,
-                    "maskedEmail", maskedEmail
-            ));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "error",
-                    "message", e.getMessage()
-            ));
-        }
+    public Map<String, Object> sendOtp(@RequestBody SendOtpDTO dto) {
+        String maskedEmail = authService.sendPasswordResetOtp(dto.getIdentifier());
+        return Map.of("status", "success", "message", "Verification code sent to " + maskedEmail, "maskedEmail", maskedEmail);
     }
 
     @PostMapping("/forgot-password/verify-otp")
-    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpDTO dto) {
-        try {
-            boolean valid = authService.verifyPasswordResetOtp(dto.getIdentifier(), dto.getOtp());
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "verified", valid,
-                    "message", "OTP verified successfully. You may now reset your password."
-            ));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "error",
-                    "message", e.getMessage()
-            ));
-        }
+    public Map<String, Object> verifyOtp(@RequestBody VerifyOtpDTO dto) {
+        boolean valid = authService.verifyPasswordResetOtp(dto.getIdentifier(), dto.getOtp());
+        return Map.of("status", "success", "verified", valid, "message", "OTP verified successfully. You may now reset your password.");
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordDTO resetDTO) {
-        try {
-            authService.resetPassword(resetDTO);
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "message", "Password has been reset successfully. You can now sign in."
-            ));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "error",
-                    "message", e.getMessage()
-            ));
-        }
+    public Map<String, Object> resetPassword(@RequestBody ResetPasswordDTO resetDTO) {
+        authService.resetPassword(resetDTO);
+        return Map.of("status", "success", "message", "Password has been reset successfully. You can now sign in.");
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> badRequest(RuntimeException e) {
+        return error(HttpStatus.BAD_REQUEST, e);
+    }
+
+    private static ResponseEntity<Map<String, String>> error(HttpStatus status, RuntimeException e) {
+        String message = Objects.requireNonNullElse(e.getMessage(), "Something went wrong");
+        return ResponseEntity.status(status).body(Map.of("status", "error", "message", message));
     }
 }
