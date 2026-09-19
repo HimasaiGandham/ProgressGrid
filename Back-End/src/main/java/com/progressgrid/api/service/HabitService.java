@@ -4,21 +4,21 @@ import com.progressgrid.api.dto.HabitDTO;
 import com.progressgrid.api.model.Habit;
 import com.progressgrid.api.model.HabitCategory;
 import com.progressgrid.api.model.HabitCompletion;
-import com.progressgrid.api.model.User;
 import com.progressgrid.api.repository.HabitCategoryRepository;
 import com.progressgrid.api.repository.HabitCompletionRepository;
 import com.progressgrid.api.repository.HabitRepository;
-import com.progressgrid.api.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,60 +31,57 @@ public class HabitService {
     private HabitCompletionRepository completionRepository;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
     private HabitCategoryRepository categoryRepository;
 
     public List<HabitDTO> getAllHabits(Long userId) {
-        List<Habit> habits = habitRepository.findByUserId(userId);
-        return habits.stream().map(this::mapToDTO).collect(Collectors.toList());
+        return habitRepository.findByUserId(userId).stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
     public HabitDTO createHabit(Long userId, HabitDTO dto) {
+        if (dto.getName() == null || dto.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Habit name is required");
+        }
+
         Habit habit = new Habit();
         habit.setUserId(userId);
-        habit.setName(dto.getName());
+        habit.setName(dto.getName().trim());
         habit.setDescription(dto.getDescription());
         habit.setFrequency(dto.getFrequency() != null ? dto.getFrequency() : "Daily");
         habit.setTargetDays(dto.getTargetDays() != null ? dto.getTargetDays() : 7);
         habit.setStartDate(dto.getStartDate() != null ? dto.getStartDate() : LocalDate.now());
 
         if (dto.getCategory() != null) {
-            // Find or create category
-            List<HabitCategory> cats = categoryRepository.findAll();
-            HabitCategory cat = cats.stream().filter(c -> c.getName().equalsIgnoreCase(dto.getCategory())).findFirst().orElseGet(() -> {
-                HabitCategory newCat = new HabitCategory();
-                newCat.setName(dto.getCategory());
-                newCat.setColor("#4CAF50");
-                return categoryRepository.save(newCat);
-            });
-            habit.setCategory(cat);
+            habit.setCategory(categoryRepository.findFirstByNameIgnoreCase(dto.getCategory()).orElseGet(() -> {
+                HabitCategory category = new HabitCategory();
+                category.setName(dto.getCategory());
+                category.setColor("#4CAF50");
+                return categoryRepository.save(category);
+            }));
         }
 
-        Habit saved = habitRepository.save(habit);
-        return mapToDTO(saved);
+        return mapToDTO(habitRepository.save(habit));
     }
 
     public void toggleCompletion(Long userId, Long habitId, LocalDate date, boolean completed) {
         Habit habit = findOwned(userId, habitId);
 
-        Optional<HabitCompletion> existing = completionRepository.findByHabitIdAndCompletionDate(habitId, date);
-        if (existing.isPresent()) {
-            if (!completed) {
-                completionRepository.delete(existing.get());
-            } else {
-                HabitCompletion comp = existing.get();
-                comp.setCompleted(true);
-                completionRepository.save(comp);
-            }
-        } else if (completed) {
-            HabitCompletion comp = new HabitCompletion();
-            comp.setHabit(habit);
-            comp.setCompletionDate(date);
-            comp.setCompleted(true);
-            completionRepository.save(comp);
+        // A tick has to fall between the habit's start date and today; ticks outside that range
+        // used to be accepted and inflated the completion percentage.
+        // ponytail: the server's clock decides "today". Send the client's date if users span timezones.
+        if (date == null || date.isBefore(habit.getStartDate()) || date.isAfter(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date must be between the habit's start date and today");
         }
+
+        Optional<HabitCompletion> existing = completionRepository.findByHabitIdAndCompletionDate(habitId, date);
+        if (!completed) {
+            existing.ifPresent(completionRepository::delete);
+            return;
+        }
+        HabitCompletion completion = existing.orElseGet(HabitCompletion::new);
+        completion.setHabit(habit);
+        completion.setCompletionDate(date);
+        completion.setCompleted(true);
+        completionRepository.save(completion);
     }
 
     public void deleteHabit(Long userId, Long id) {
@@ -111,68 +108,53 @@ public class HabitService {
         dto.setTargetDays(habit.getTargetDays());
         dto.setStartDate(habit.getStartDate());
 
-        List<HabitCompletion> comps = completionRepository.findByHabitId(habit.getId());
-        List<LocalDate> completedDates = comps.stream()
+        List<LocalDate> completedDates = completionRepository.findByHabitId(habit.getId()).stream()
                 .filter(HabitCompletion::getCompleted)
                 .map(HabitCompletion::getCompletionDate)
                 .sorted()
                 .collect(Collectors.toList());
         dto.setCompletions(completedDates);
 
-        // Calculate streaks
-        calculateStreaksAndStats(dto, completedDates, habit.getStartDate());
-
+        calculateStreaksAndStats(dto, completedDates, habit.getStartDate(), "weekly".equalsIgnoreCase(habit.getFrequency()));
         return dto;
     }
 
-    private void calculateStreaksAndStats(HabitDTO dto, List<LocalDate> dates, LocalDate startDate) {
-        if (dates.isEmpty()) {
-            dto.setCurrentStreak(0);
-            dto.setBestStreak(0);
-            dto.setCompletedDays(0);
-            dto.setCompletionPercentage(0);
-            return;
+    /**
+     * Streaks and completion % in the habit's own unit: days for a daily habit, weeks for a weekly
+     * one, where any tick in a Monday-to-Sunday week completes that week.
+     */
+    private void calculateStreaksAndStats(HabitDTO dto, List<LocalDate> dates, LocalDate startDate, boolean weekly) {
+        int step = weekly ? 7 : 1;
+        LocalDate now = periodOf(LocalDate.now(), weekly);
+        LocalDate first = periodOf(startDate, weekly);
+        TreeSet<LocalDate> done = dates.stream()
+                .map(date -> periodOf(date, weekly))
+                .filter(period -> !period.isBefore(first) && !period.isAfter(now))
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        int best = 0;
+        int run = 0;
+        LocalDate previous = null;
+        for (LocalDate period : done) {
+            run = period.minusDays(step).equals(previous) ? run + 1 : 1;
+            best = Math.max(best, run);
+            previous = period;
         }
 
-        int currentStreak = 0;
-        int bestStreak = 0;
-        int tempStreak = 0;
-
-        LocalDate today = LocalDate.now();
-        LocalDate lastDate = null;
-
-        // Simple contiguous days calculation
-        for (LocalDate date : dates) {
-            if (lastDate == null) {
-                tempStreak = 1;
-            } else if (date.equals(lastDate.plusDays(1))) {
-                tempStreak++;
-            } else if (!date.equals(lastDate)) { // ignores duplicates if any
-                tempStreak = 1;
-            }
-            if (tempStreak > bestStreak) bestStreak = tempStreak;
-            lastDate = date;
+        // Today (or this week) may simply not be done yet, so a run ending one period back still counts.
+        int current = 0;
+        for (LocalDate p = done.contains(now) ? now : now.minusDays(step); done.contains(p); p = p.minusDays(step)) {
+            current++;
         }
 
-        // Calculate current streak
-        if (dates.contains(today) || dates.contains(today.minusDays(1))) {
-            tempStreak = 0;
-            LocalDate checkDate = dates.contains(today) ? today : today.minusDays(1);
-            while (dates.contains(checkDate)) {
-                tempStreak++;
-                checkDate = checkDate.minusDays(1);
-            }
-            currentStreak = tempStreak;
-        }
-
-        dto.setCurrentStreak(currentStreak);
-        dto.setBestStreak(bestStreak);
+        long periods = Math.max(1, ChronoUnit.DAYS.between(first, now) / step + 1);
+        dto.setCurrentStreak(current);
+        dto.setBestStreak(best);
         dto.setCompletedDays(dates.size());
-        
-        long totalDaysSinceStart = java.time.temporal.ChronoUnit.DAYS.between(startDate, today) + 1;
-        if (totalDaysSinceStart <= 0) totalDaysSinceStart = 1; // Prevent div by zero
-        int percentage = (int) Math.round(((double) dates.size() / totalDaysSinceStart) * 100);
-        if(percentage > 100) percentage = 100;
-        dto.setCompletionPercentage(percentage);
+        dto.setCompletionPercentage((int) Math.min(100, Math.round(100.0 * done.size() / periods)));
+    }
+
+    private static LocalDate periodOf(LocalDate date, boolean weekly) {
+        return weekly ? date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : date;
     }
 }
