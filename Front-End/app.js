@@ -133,6 +133,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Local storage helpers for offline resilience. They live at this level rather than inside
+    // attachEventListeners() because renderGrid() and fetchHabits() call them too; nested there,
+    // ticking a habit threw a ReferenceError before the change ever reached the server.
+    function getStoredHabits() {
+        const stored = localStorage.getItem('pg_local_habits');
+        if (stored) {
+            try { return JSON.parse(stored); } catch(e) {}
+        }
+        const today = new Date();
+        const d0 = formatDateIso(today);
+        const d1 = formatDateIso(new Date(Date.now() - 86400000));
+        const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
+        const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
+        const defaults = [
+            {
+                id: 101,
+                name: 'Morning Workout & Stretch',
+                category: 'Health',
+                frequency: 'DAILY',
+                currentStreak: 3,
+                bestStreak: 7,
+                completionPercentage: 85,
+                completions: [d0, d1, d2]
+            },
+            {
+                id: 102,
+                name: 'Read 20 Pages',
+                category: 'Productivity',
+                frequency: 'DAILY',
+                currentStreak: 4,
+                bestStreak: 12,
+                completionPercentage: 90,
+                completions: [d0, d1, d2, d3]
+            },
+            {
+                id: 103,
+                name: 'Drink 2.5L Water',
+                category: 'Health',
+                frequency: 'DAILY',
+                currentStreak: 2,
+                bestStreak: 6,
+                completionPercentage: 70,
+                completions: [d0, d1]
+            },
+            {
+                id: 104,
+                name: 'Weekly Planning & Review',
+                category: 'Work',
+                frequency: 'WEEKLY',
+                currentStreak: 1,
+                bestStreak: 4,
+                completionPercentage: 100,
+                completions: [d0]
+            }
+        ];
+        saveStoredHabits(defaults);
+        return defaults;
+    }
+
+    function saveStoredHabits(data) {
+        localStorage.setItem('pg_local_habits', JSON.stringify(data));
+    }
+
     function attachEventListeners() {
         // Tab Navigation
         function showDashboard() {
@@ -292,67 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeHabitModal.addEventListener('click', () => addHabitModal.classList.remove('active'));
         cancelHabitBtn.addEventListener('click', () => addHabitModal.classList.remove('active'));
         
-        // Local Storage Helpers for smooth testing & offline resilience
-        function getStoredHabits() {
-            const stored = localStorage.getItem('pg_local_habits');
-            if (stored) {
-                try { return JSON.parse(stored); } catch(e) {}
-            }
-            const today = new Date();
-            const d0 = formatDateIso(today);
-            const d1 = formatDateIso(new Date(Date.now() - 86400000));
-            const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
-            const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
-            const defaults = [
-                {
-                    id: 101,
-                    name: 'Morning Workout & Stretch',
-                    category: 'Health',
-                    frequency: 'DAILY',
-                    currentStreak: 3,
-                    bestStreak: 7,
-                    completionPercentage: 85,
-                    completions: [d0, d1, d2]
-                },
-                {
-                    id: 102,
-                    name: 'Read 20 Pages',
-                    category: 'Productivity',
-                    frequency: 'DAILY',
-                    currentStreak: 4,
-                    bestStreak: 12,
-                    completionPercentage: 90,
-                    completions: [d0, d1, d2, d3]
-                },
-                {
-                    id: 103,
-                    name: 'Drink 2.5L Water',
-                    category: 'Health',
-                    frequency: 'DAILY',
-                    currentStreak: 2,
-                    bestStreak: 6,
-                    completionPercentage: 70,
-                    completions: [d0, d1]
-                },
-                {
-                    id: 104,
-                    name: 'Weekly Planning & Review',
-                    category: 'Work',
-                    frequency: 'WEEKLY',
-                    currentStreak: 1,
-                    bestStreak: 4,
-                    completionPercentage: 100,
-                    completions: [d0]
-                }
-            ];
-            saveStoredHabits(defaults);
-            return defaults;
-        }
-
-        function saveStoredHabits(data) {
-            localStorage.setItem('pg_local_habits', JSON.stringify(data));
-        }
-
         // Form
         addHabitForm.addEventListener('submit', async (e) => {
             e.preventDefault();
