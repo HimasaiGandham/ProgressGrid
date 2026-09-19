@@ -1,111 +1,108 @@
-# 🚀 ProgressGrid – Project Introduction
+# ProgressGrid
 
-<p align="center">
-  <img src="Front-End/logo.png" alt="ProgressGrid Logo" width="120" />
-</p>
+ProgressGrid is a habit tracker. You list the habits you want to keep up with, tick them off day by day on a weekly grid, and the dashboard shows how consistent you've been: streaks, completion rates and a chart of the week.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 17" />
-  <img src="https://img.shields.io/badge/Spring_Boot-3.0-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
-  <img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript" />
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5" />
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3" />
-</p>
+Each account only sees its own habits. The backend is a Spring Boot API backed by MySQL, and the frontend is plain HTML, CSS and JavaScript with no build step.
 
-**ProgressGrid** is a web-based **project and task management system** designed to help teams plan, organize, assign, and monitor their work from a single centralized platform. 
+## What you can do
 
-In many projects, tracking tasks through spreadsheets, messages, and manual updates can make it difficult to understand **who is responsible for a task, what has been completed, and what still needs attention**. Progress Grid addresses this problem by providing a **visual and organized workspace** where project activities can be monitored easily.
+- Sign up, then sign in with your username or email. If you forget your password, you can get a 6-digit code by email and set a new one.
+- Add a habit with a name, a category (Health, Fitness, Study, Work or Personal), how often you want to do it (daily or weekly) and a start date.
+- Tick or untick days on the weekly grid, from the habit's start date up to today, and move back and forward a week at a time.
+- See your total habits, your longest current and best streak, this week's completion so far, and overall completion since each habit started.
+- Check the weekly progress chart. Each day's bar shows how many of your daily habits you got done, coloured from red up to green.
+- See today's habits in one list and the habits with your best completion rate in another.
+- Set your name, email, phone number and a profile photo on the profile page.
 
-The system uses a **progress grid and dashboard-based approach** to display task status, team responsibilities, deadlines, and overall project completion. Team members can update their assigned tasks, while project coordinators can get a clear overview of the team's progress.
+Weekly habits are counted in weeks rather than days: any tick between Monday and Sunday completes that week, and their streaks are in weeks too.
 
-By bringing project information into one platform, Progress Grid aims to improve **visibility, accountability, collaboration, and productivity**. ⚡ It provides a simple foundation that can also be extended with advanced features such as notifications, analytics, reports, role-based access, and performance tracking.
+## Running it locally
 
----
+You'll need Java 17 or newer, Maven, MySQL 8, and Python 3 for the small dev server.
 
-## 🌟 Key Features
+### 1. Database
 
-- **Visual Progress Tracking** – Monitor project completion through an intuitive progress grid.
-- **Task Management** – Create, update, prioritize, and manage project tasks and daily activities.
-- **Team Assignment & Ownership** – Assign tasks and responsibilities to specific team members.
-- **Status Updates** – Track tasks as pending, in progress, or completed with real-time feedback.
-- **Deadline & Streak Tracking** – Monitor upcoming deadlines and calculate consistency streaks.
-- **Progress Dashboard** – Get a quick overview of overall project and team progress with interactive charts.
-- **Accountability & Transparency** – Clearly identify task ownership and current status.
-- **Centralized Data Management** – Keep project, task, and team information organized in one place.
-- **Email OTP & Security** – Secure account registration, authentication, and password reset flows.
-- **Improved Collaboration** – Help team members coordinate their work more effectively.
-- **Scalable Architecture** – Clean separation between Spring Boot backend, MySQL database, and frontend dashboard.
+Create the database and the user the backend connects with (run it as the MySQL root user):
 
----
-
-## 💻 Technology Stack
-
-| Layer | Technologies | Details |
-|---|---|---|
-| **Backend** | **Java 17, Spring Boot 3** | RESTful APIs, Spring Data JPA, Hibernate, Spring Security |
-| **Database** | **MySQL 8.0** | Relational schemas, foreign keys, cascading deletions, seed routines |
-| **Frontend** | **JavaScript (ES6+), HTML5, CSS3** | Dynamic responsive glassmorphic dashboard, Chart.js analytics |
-
----
-
-## 🎯 Project Goal
-
-The goal of **Progress Grid** is to provide teams with a **simple, visual, and centralized platform** to manage project activities, understand responsibilities, track completion, and identify pending work.
-
----
-
-## 📂 Directory Structure
-
-```
-ProgressGrid/
-├── Back-End/              # Spring Boot 3 & Java 17 REST API
-│   ├── pom.xml            # Maven configuration and dependencies
-│   ├── src/main/java/     # Application controllers, models, DTOs, services, repositories
-│   └── src/main/resources/# application.properties database configuration
-├── Front-End/             # Vanilla Web Client (HTML5, CSS3, JavaScript)
-│   ├── index.html         # Main dashboard & interactive progress grid view
-│   ├── style.css          # Design system & dark glassmorphic styling
-│   ├── app.js             # Dynamic grid rendering, Chart.js & progress calculations
-│   ├── login.html         # Authentication & email OTP verification view
-│   ├── login.css          # Login & security modal stylesheet
-│   ├── login.js           # Auth handler logic & OTP verification
-│   └── logo.png           # Brand logo asset
-├── Data-Base/             # MySQL Database DDL & Initialization
-│   ├── schema.sql         # Relational database table schemas
-│   └── seed.sql           # Initial category definitions and seed records
-├── dev_server.py          # Python dev server with live /api proxy to backend
-├── run-app.bat            # Windows startup script
-└── run-app.ps1            # PowerShell automation script
-```
-
----
-
-## 🚀 Running the Application
-
-### 1. Database Setup
-```sql
+```bash
 mysql -u root -p < Data-Base/schema.sql
-mysql -u root -p < Data-Base/seed.sql
 ```
 
-### 2. Start the Backend (Spring Boot)
+For sample data, run `Data-Base/seed.sql` the same way. It adds an `admin` user (password `dummy_hash`), the five categories, five habits and some ticked days. See [Data-Base/README.md](Data-Base/README.md) for details.
+
+### 2. Backend and frontend
+
+On Windows, double-click `run-app.bat`. It starts the dev server in its own window, opens the browser and then starts the backend.
+
+Or start them yourself in two terminals:
+
 ```bash
 cd Back-End
 mvn spring-boot:run
 ```
-*Listens on port `8080` (`http://localhost:8080`).*
 
-### 3. Start the Frontend Dev Server
 ```bash
 python dev_server.py
 ```
-*Open `http://localhost:3000` in your browser to access the complete application with live `/api` proxying.*
 
----
+Then open http://localhost:3000. The backend runs on port 8080, and the dev server serves the `Front-End` folder and forwards anything under `/api` to it, so use the dev server instead of opening the HTML files directly.
 
-## 📖 Module Documentation
+If the dashboard says it couldn't load your habits, the backend isn't running or can't reach MySQL.
 
-- [Back-End Documentation](Back-End/README.md)
-- [Front-End Documentation](Front-End/README.md)
-- [Data-Base Documentation](Data-Base/README.md)
+## Configuration
+
+Settings live in `Back-End/src/main/resources/application.properties`. The database login is set there directly. These can be set through environment variables instead:
+
+| Variable | What it's for |
+|---|---|
+| `JWT_SECRET` | Signs login sessions. Use at least 32 random characters in production. If it isn't set, a random key is generated on startup and everyone is signed out whenever the backend restarts. |
+| `JWT_EXPIRATION_MS` | How long a session lasts. Defaults to 24 hours. |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Sends password reset emails through Resend. |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP, used if Resend isn't set up. |
+
+If no email option is set up, or sending fails, the reset code is printed in the backend console instead, which is handy while testing.
+
+## API
+
+Everything under `/api/habits` needs the token you get back from login or signup, sent as `Authorization: Bearer <token>`. The `/api/auth` endpoints report errors as `{"status": "error", "message": "..."}`.
+
+| Method | Path | |
+|---|---|---|
+| POST | `/api/auth/signup` | Create an account |
+| POST | `/api/auth/login` | Sign in and get a token |
+| POST | `/api/auth/forgot-password/send-otp` | Email a reset code |
+| POST | `/api/auth/forgot-password/verify-otp` | Check the code |
+| POST | `/api/auth/reset-password` | Set a new password once the code is verified |
+| GET | `/api/habits` | Your habits, with streaks and completion stats |
+| POST | `/api/habits` | Add a habit |
+| POST | `/api/habits/{id}/complete` | Tick or untick a day, e.g. `{"date": "2026-09-19", "completed": true}` |
+| DELETE | `/api/habits/{id}` | Delete a habit |
+
+Reset codes are 6 digits, expire after 10 minutes, and stop working after 5 wrong guesses.
+
+## Tests
+
+```bash
+cd Back-End
+mvn test
+```
+
+The 12 tests use an in-memory H2 database, so MySQL doesn't need to be running. They cover signing up and logging in, password hashing, the reset flow, that one user can't see or change another user's habits, which days can be ticked, and how streaks and completion are worked out.
+
+## Project layout
+
+```
+Back-End/       Spring Boot API               (see Back-End/README.md)
+Front-End/      Login page and dashboard      (see Front-End/README.md)
+Data-Base/      MySQL setup and sample data   (see Data-Base/README.md)
+dev_server.py   Serves Front-End on port 3000 and forwards /api to the backend
+run-app.bat     Starts everything on Windows
+```
+
+## Not done yet
+
+- My Habits, Statistics and Calendar in the sidebar just show the dashboard for now.
+- You can't edit or delete a habit from the site yet. The delete endpoint exists but nothing on the page calls it.
+- Profile changes are only saved in your browser. Changing your username there doesn't change the one you sign in with.
+- Asking for a reset code for an account that doesn't exist says so, which lets someone check whether an account exists.
+- "Today" is decided by the server's clock, so users in a very different timezone from the server may find the grid a day off.

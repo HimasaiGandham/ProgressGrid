@@ -1,41 +1,26 @@
-# 🗄️ ProgressGrid - Database
+# Data-Base
 
-<p align="left">
-  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
-  <img src="https://img.shields.io/badge/SQL-DDL%20%26%20DML-orange?style=for-the-badge" alt="SQL" />
-</p>
+MySQL scripts for ProgressGrid.
 
-This directory contains the foundational SQL scripts required to set up the MySQL database for the ProgressGrid platform. It provides the relational schema definitions and initial mock data needed for local development and testing.
+- `schema.sql` creates the `progressgrid_db` database, the `pg_user` account the backend signs in with, and the four tables. It's safe to run again, since nothing gets dropped.
+- `seed.sql` adds sample data: an `admin` user (password `dummy_hash`), five categories, five habits, and ticks from the first week of September 2026. Run it once, on a fresh database.
 
----
+Run both as the MySQL root user:
 
-## 📂 File Structure & Purpose
+```bash
+mysql -u root -p < schema.sql
+mysql -u root -p < seed.sql
+```
 
-- **`schema.sql`**
-  This script contains the raw SQL commands to define the relational database structure:
-  - Creates the `progressgrid` database cleanly.
-  - Creates core tables: `users`, `habit_categories`, `habits`, and `habit_completions`.
-  - Establishes Primary Keys, Foreign Keys, unique constraints, and cascading deletion rules (e.g. deleting a habit automatically deletes its completions).
-  - Sets up audit timestamps (`created_at`, `updated_at`).
+The backend also creates any missing tables and columns when it starts (`spring.jpa.hibernate.ddl-auto=update`), so the table definitions in `schema.sql` are mostly there as a reference. The database and user still have to exist, though.
 
-- **`seed.sql`**
-  This script populates the database with realistic sample data:
-  - A default user account.
-  - 5 default habit categories with associated hex theme colors (Health, Fitness, Personal, Work, Study).
-  - Sample habits belonging to the user.
-  - A historical log of `habit_completions` simulating checked-off days so that the frontend charts and streak calculations have real data to process immediately upon first load.
+If you change the database name, user or password, change them in `Back-End/src/main/resources/application.properties` too.
 
----
+## Tables
 
-## 🚀 How to Use
-
-1. Open your MySQL client (e.g., **MySQL Workbench** or command line).
-2. Execute **`schema.sql`** to build the database structure:
-   ```bash
-   mysql -u root -p < schema.sql
-   ```
-3. Execute **`seed.sql`** to populate it with starter data:
-   ```bash
-   mysql -u root -p < seed.sql
-   ```
-4. Your Spring Boot backend is now ready to connect.
+| Table | What's in it |
+|---|---|
+| `users` | Accounts. `password_hash` holds a BCrypt hash. |
+| `habit_categories` | Category name and colour. The app creates a new one if a habit uses a name that isn't there yet. |
+| `habits` | Each habit belongs to one user. `frequency` is `Daily` or `Weekly`, and `start_date` is the first day that can be ticked. |
+| `habit_completions` | One row per ticked day. Unticking deletes the row. |
