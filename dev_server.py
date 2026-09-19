@@ -1,4 +1,5 @@
 import http.server
+import json
 import socketserver
 import os
 import sys
@@ -94,17 +95,25 @@ class LiveDevelopmentHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(err_body)
         except Exception as ex:
+            # Backend not running: answer in the {"message": ...} shape the pages already display.
+            sys.stderr.write(f"[DevServer] proxy error: {ex}\n")
+            body = json.dumps({"message": f"Can't reach the backend at {BACKEND_URL}. Is it running?"}).encode()
             self.send_response(502)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(f"Proxy Error: {str(ex)}".encode())
+            self.wfile.write(body)
 
     def log_message(self, format, *args):
         # Clean log message
         sys.stderr.write(f"[DevServer] {args[0]} -> {args[1]}\n")
 
 if __name__ == "__main__":
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), LiveDevelopmentHandler) as httpd:
+    # Threaded: browsers open spare connections in advance, and a single-threaded server
+    # blocks on one of them, so every other request hangs until it's restarted.
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    socketserver.ThreadingTCPServer.daemon_threads = True
+    with socketserver.ThreadingTCPServer(("", PORT), LiveDevelopmentHandler) as httpd:
         print(f"==================================================")
         print(f" Live Dev Server listening on http://localhost:{PORT}")
         print(f" Serving live directory: {FRONT_END_DIR}")
