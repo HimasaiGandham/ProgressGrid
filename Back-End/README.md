@@ -1,61 +1,47 @@
-# ⚙️ ProgressGrid - Backend
+# Back-End
 
-<p align="left">
-  <img src="https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 17" />
-  <img src="https://img.shields.io/badge/Spring_Boot-3.0-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Data JPA" />
-  <img src="https://img.shields.io/badge/MySQL-Connector-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
-</p>
+The ProgressGrid API: Spring Boot 3.1 on Java 17, with MySQL through Spring Data JPA.
 
-This directory contains the robust server-side logic for the ProgressGrid platform. It is built using **Java 17** and **Spring Boot 3**, utilizing Spring Data JPA to communicate with the MySQL database.
+## Layout
 
----
+```
+src/main/java/com/progressgrid/api/
+  controller/   AuthController (sign-up, login, password reset) and HabitController (habits and ticks)
+  service/      AuthService, HabitService (streaks and completion), OtpService (reset codes), EmailService
+  security/     TokenService issues and checks login tokens; AuthConfig requires one on /api/habits
+  model/        JPA entities: User, Habit, HabitCategory, HabitCompletion
+  repository/   Spring Data repositories
+  dto/          Request and response objects
+```
 
-## 📂 Architecture & File Structure
+## Signing in
 
-The project is structured using standard Spring Boot layered architecture:
+Login and signup return a JWT signed with `JWT_SECRET`. Every request to `/api/habits` has to send it as `Authorization: Bearer <token>`. The user id is taken from the token, never from the request, and a habit that belongs to someone else is reported as not found.
 
-- **`pom.xml`**
-  The Maven configuration file. It manages all dependencies (Spring Web, Spring Data JPA, MySQL Connector) and plugins required to build the application.
+Passwords are stored as BCrypt hashes. Older accounts that still hold a plain-text password, like the seed user, can sign in once with it, and it's hashed on the spot.
 
-- **`src/main/resources/application.properties`**
-  The core configuration file. It defines the database connection URL, credentials, Hibernate DDL settings, and the local server port (`8080`).
+Password reset works in three calls: `send-otp` emails a 6-digit code, `verify-otp` checks it, and `reset-password` sets the new password. The code expires after 10 minutes, and 5 wrong guesses discard it. `reset-password` only accepts a code that has already passed `verify-otp`.
 
-- **`src/main/java/com/progressgrid/api/`** (Root Package)
-  - **`ProgressGridApplication.java`**: The main class that bootstraps and launches the Spring Boot application.
+## How habits are scored
 
-### 📦 Sub-Packages
+Daily habits are counted in days. Weekly habits are counted in Monday-to-Sunday weeks, and a week counts as done if it has at least one tick.
 
-- **`model/` (JPA Entities)**
-  Contains the database models mapped via Hibernate:
-  - `User.java`: User account information and authentication credentials.
-  - `HabitCategory.java`: Categories for habits (e.g., Health, Work, Study).
-  - `Habit.java`: The core habit/task definition.
-  - `HabitCompletion.java`: Tracks the specific dates an activity was successfully checked off.
+The current streak is the run of days (or weeks) done up to today. If today isn't ticked yet, a run that ended yesterday still counts, so the streak doesn't reset in the morning. The best streak is the longest run so far. Completion is the number of days (or weeks) done divided by the number since the start date, capped at 100%.
 
-- **`repository/` (Data Access Layer)**
-  Spring Data interfaces that provide automatic CRUD operations for entities without writing raw SQL (`UserRepository`, `HabitRepository`, `HabitCompletionRepository`, `HabitCategoryRepository`).
+A tick has to fall between the habit's start date and today; anything else gets a 400.
 
-- **`service/` (Business Logic Layer)**
-  - `HabitService.java`: Maps database entities into DTOs and handles core business logic including **Current Streak**, **Best Streak**, and **Completion Percentages**.
-  - `AuthService.java`: Manages user registration, password verification, and authentication tokens.
-  - `EmailService.java` & `OtpService.java`: Coordinates transactional email OTP generation and validation for password recovery.
+## Running
 
-- **`dto/` (Data Transfer Objects)**
-  - `HabitDTO.java`, `ToggleCompletionDTO.java`, `LoginDTO.java`, `VerifyOtpDTO.java`: Plain Java objects used to format data cleanly across the REST API, preventing infinite loops or exposing sensitive database columns.
+```bash
+mvn spring-boot:run
+```
 
-- **`controller/` (REST API Layer)**
-  - `HabitController.java`: The REST API endpoints (`GET /api/habits`, `POST /api/habits`, etc.). Includes `@CrossOrigin` to seamlessly accept requests from the web frontend.
-  - `AuthController.java`: Authentication and OTP verification endpoints (`POST /api/auth/login`, `POST /api/auth/send-otp`, etc.).
+It starts on port 8080 and needs the MySQL database from `Data-Base/schema.sql`. Settings are in `src/main/resources/application.properties`, and the environment variables it reads are listed in the main README.
 
----
+## Tests
 
-## 🚀 How to Run
+```bash
+mvn test
+```
 
-1. Open this `Back-End` folder as a project in your Java IDE (IntelliJ IDEA, Eclipse, or VS Code).
-2. Ensure your local MySQL database is running and the `progressgrid` schema exists.
-3. Run the `ProgressGridApplication.java` main class or use Maven:
-   ```bash
-   mvn spring-boot:run
-   ```
-4. The server will start on `http://localhost:8080`.
+`AuthSecurityTests` covers sign-in, hashing, sessions, ownership and password reset. `HabitRulesTests` covers habit input, which days can be ticked, and streak and completion scoring. Both run against in-memory H2, set up in `src/test/resources/application-test.properties`.

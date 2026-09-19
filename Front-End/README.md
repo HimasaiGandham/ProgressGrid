@@ -1,50 +1,27 @@
-# 🎨 ProgressGrid - Frontend
+# Front-End
 
-<p align="left">
-  <img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript" />
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5" />
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3" />
-  <img src="https://img.shields.io/badge/Chart.js-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js" />
-</p>
+Plain HTML, CSS and JavaScript, with no build step. Chart.js is loaded from a CDN for the weekly chart.
 
-This directory contains the user interface and presentation logic for the ProgressGrid dashboard. It is built using **Vanilla HTML5, CSS3, and JavaScript** without heavy framework overhead, ensuring it is lightweight, responsive, lightning-fast, and easy to customize.
+- `login.html`, `login.css`, `login.js`: sign in, sign up, and the three-step password reset (request a code, enter it, choose a new password).
+- `index.html`, `style.css`, `app.js`: the dashboard (summary cards, weekly grid, chart, today's habits, top habits) and the profile page.
+- `logo.png`: the logo.
 
----
+The pages call `/api` on the same address they were loaded from, so serve them with `dev_server.py` from the project root. It forwards `/api` to the backend on port 8080. Opening the files straight from disk won't work.
 
-## 📂 File Structure & Purpose
+## What the browser keeps
 
-- **`index.html`**
-  The main dashboard view. Contains the structural layout for sidebar navigation, summary overview cards, the dynamic habit/activity grid, right-side analytics panels, and the modal dialogs for adding habits.
+Everything is in `localStorage`:
 
-- **`style.css`**
-  The dashboard stylesheet. Implements the dark glassmorphic design system, responsive layouts, hover animations, and custom CSS variables for completion intensity.
+| Key | What it holds |
+|---|---|
+| `progressgrid_token` | The login token. Without it the dashboard sends you to the sign-in page, and a rejected token signs you out. |
+| `username`, `email` | The signed-in account, shown in the sidebar and on the profile page. |
+| `userFullName`, `userEmail`, `userMobile`, `userAvatar` | Changes made on the profile page. These only live in the browser for now and aren't sent to the backend. |
 
-- **`app.js`**
-  The core dashboard application logic:
-  - **API Communication**: Fetches habits and records completions with the Spring Boot backend (`/api/habits`).
-  - **Dynamic Rendering**: Renders the 7-day completion grid and updates dates dynamically based on the active week.
-  - **Optimistic UI**: Instantly updates checkbox states and synchronizes with server state.
-  - **Analytics**: Calculates completion rates, streaks, and renders weekly progress graphs using **Chart.js**.
+Logging out clears all of it.
 
-- **`login.html`**
-  The authentication interface providing user login, signup, and 3-step security modal for password recovery with email OTP verification.
+## How the dashboard works
 
-- **`login.css`**
-  Styles for the authentication views, glassmorphic auth cards, form inputs, and verification modals.
+`app.js` loads your habits from `GET /api/habits`, which includes each habit's ticks, streaks and completion. When you tick a box it shows the tick straight away, sends it to the backend, then reloads the habits so the streaks and percentages match what the server worked out.
 
-- **`login.js`**
-  Handles authentication state, credentials validation, OTP request/verification timers, and password reset flows.
-
-- **`logo.png`**
-  Official brand identity icon and logo.
-
----
-
-## 🚀 How to Run
-
-1. Ensure the Spring Boot backend is running on `http://localhost:8080`.
-2. Start the local development server from the repository root:
-   ```bash
-   python dev_server.py
-   ```
-3. Open `http://localhost:3000` in your web browser.
+The weekly grid, the "Weekly Completion" card and the chart are worked out in the browser from the ticks. Only days from a habit's start date up to today can be ticked. The chart bars only count daily habits, since weekly habits aren't due on any particular day.
