@@ -9,8 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
         return;
     }
-    const parsedId = parseInt(rawUserId);
-    const userId = (!isNaN(parsedId) && parsedId > 0) ? parsedId : 1;
+    // A missing or expired session: sign in again instead of silently showing cached data.
+    // The backend identifies the user from the session token, so no user id is sent any more.
+    function handleUnauthorized(res) {
+        if (res.status !== 401) return false;
+        localStorage.clear();
+        window.location.href = 'login.html';
+        return true;
+    }
 
     // State
     let habits = [];
@@ -66,10 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initProfileData() {
-        const storedFullName = localStorage.getItem('userFullName') || 'Himasai Gandham';
-        const storedUsername = localStorage.getItem('username') || 'gg6709';
-        const storedEmail = localStorage.getItem('userEmail') || (storedUsername.includes('@') ? storedUsername : 'gg6709@srmist.edu.in');
-        const storedMobile = localStorage.getItem('userMobile') || '+91 98765 43210';
+        // Fall back to the signed-in account, never to a hardcoded person. login.js saves the
+        // email as 'email'; 'userEmail' only exists once the profile form has been saved.
+        const storedUsername = localStorage.getItem('username') || 'User';
+        const storedFullName = localStorage.getItem('userFullName') || storedUsername;
+        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || '';
+        const storedMobile = localStorage.getItem('userMobile') || '';
         const storedAvatar = localStorage.getItem('userAvatar');
 
         if (profileNameInput) profileNameInput.value = storedFullName;
@@ -369,8 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
                 const token = localStorage.getItem('progressgrid_token');
                 const headers = { 
-                    'Content-Type': 'application/json',
-                    'X-User-Id': userId
+                    'Content-Type': 'application/json'
                 };
                 if (token) headers['Authorization'] = 'Bearer ' + token;
 
@@ -381,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
+                if (handleUnauthorized(res)) return;
                 if(res.ok) {
                     savedOnBackend = true;
                     const serverHabit = await res.json();
@@ -432,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 1200);
             const token = localStorage.getItem('progressgrid_token');
-            const headers = { 'X-User-Id': userId };
+            const headers = {};
             if (token) headers['Authorization'] = 'Bearer ' + token;
 
             const res = await fetch(API_URL, {
@@ -440,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 habits = await res.json();
                 loadedFromServer = true;
@@ -576,18 +585,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const timeoutId = setTimeout(() => controller.abort(), 1200);
                     const token = localStorage.getItem('progressgrid_token');
                     const headers = { 
-                        'Content-Type': 'application/json',
-                        'X-User-Id': userId
+                        'Content-Type': 'application/json'
                     };
                     if (token) headers['Authorization'] = 'Bearer ' + token;
 
-                    await fetch(`${API_URL}/${habitId}/complete`, {
+                    const res = await fetch(`${API_URL}/${habitId}/complete`, {
                         method: 'POST',
                         headers: headers,
                         body: JSON.stringify({ date: dateStr, completed: isCompleted }),
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
+                    handleUnauthorized(res);
                 } catch(err) {
                     // Offline - state already persisted locally
                 }
