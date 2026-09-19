@@ -3,6 +3,7 @@ package com.progressgrid.api.controller;
 import com.progressgrid.api.dto.*;
 import com.progressgrid.api.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,13 +17,17 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    // Errors are JSON {"message": ...} like the other endpoints here. A bare-string body made
+    // login.js throw while reading it, and that throw fell into its offline fallback, which
+    // signed the visitor in regardless of the password.
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDTO loginDTO) {
         try {
             AuthResponseDTO response = authService.login(loginDTO);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -32,7 +37,7 @@ public class AuthController {
             AuthResponseDTO response = authService.signup(signupDTO);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 

@@ -10,7 +10,9 @@ import com.progressgrid.api.repository.HabitCompletionRepository;
 import com.progressgrid.api.repository.HabitRepository;
 import com.progressgrid.api.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -64,9 +66,9 @@ public class HabitService {
         return mapToDTO(saved);
     }
 
-    public void toggleCompletion(Long habitId, LocalDate date, boolean completed) {
-        Habit habit = habitRepository.findById(habitId).orElseThrow(() -> new RuntimeException("Habit not found"));
-        
+    public void toggleCompletion(Long userId, Long habitId, LocalDate date, boolean completed) {
+        Habit habit = findOwned(userId, habitId);
+
         Optional<HabitCompletion> existing = completionRepository.findByHabitIdAndCompletionDate(habitId, date);
         if (existing.isPresent()) {
             if (!completed) {
@@ -85,8 +87,18 @@ public class HabitService {
         }
     }
 
-    public void deleteHabit(Long id) {
-        habitRepository.deleteById(id);
+    public void deleteHabit(Long userId, Long id) {
+        habitRepository.delete(findOwned(userId, id));
+    }
+
+    /**
+     * The habit, if it belongs to this user. Someone else's habit is reported as not found
+     * rather than forbidden, so habit ids can't be probed for existence.
+     */
+    private Habit findOwned(Long userId, Long habitId) {
+        return habitRepository.findById(habitId)
+                .filter(habit -> userId.equals(habit.getUserId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habit not found"));
     }
 
     private HabitDTO mapToDTO(Habit habit) {
