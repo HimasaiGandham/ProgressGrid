@@ -1,21 +1,14 @@
 @echo off
-echo =======================================================
-echo     Starting ProgressGrid Habit Tracker ...
-echo =======================================================
-echo.
-echo [1] Checking for Maven...
-if not exist "apache-maven-3.9.5" (
-    echo Maven not found locally. Please ensure you have an IDE or Maven installed,
-    echo or run the setup script to download it.
-) else (
-	set "PATH=%CD%\apache-maven-3.9.5\bin;%PATH%"
-)
+rem Starts ProgressGrid: the backend on http://localhost:8080 and the site on http://localhost:3000.
+rem Needs Java 17+, Python 3, and Maven either on PATH or unzipped into apache-maven-3.9.5 here.
+cd /d "%~dp0"
 
-echo [2] Launching Frontend in your default browser...
-start "" "http://localhost:3000/login.html"
+set "MVN=mvn"
+if exist "apache-maven-3.9.5\bin\mvn.cmd" set "MVN=%CD%\apache-maven-3.9.5\bin\mvn.cmd"
 
-echo [3] Starting Spring Boot Backend...
+start "ProgressGrid site" cmd /k python dev_server.py
+start "" "http://localhost:3000"
+
 cd Back-End
-call ..\apache-maven-3.9.5\bin\mvn.cmd spring-boot:run
-
+call "%MVN%" spring-boot:run
 pause
