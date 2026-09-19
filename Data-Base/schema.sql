@@ -1,22 +1,30 @@
-DROP DATABASE IF EXISTS progressgrid;
-CREATE DATABASE progressgrid;
-USE progressgrid;
+-- Creates the database and the MySQL user the backend connects with (see
+-- Back-End/src/main/resources/application.properties). Run it as root:
+--   mysql -u root -p < Data-Base/schema.sql
+-- It's safe to run again: nothing gets dropped, and the backend also adds any
+-- missing tables or columns itself when it starts.
 
-CREATE TABLE users (
+CREATE DATABASE IF NOT EXISTS progressgrid_db;
+CREATE USER IF NOT EXISTS 'pg_user'@'localhost' IDENTIFIED BY 'password123';
+GRANT ALL PRIVILEGES ON progressgrid_db.* TO 'pg_user'@'localhost';
+USE progressgrid_db;
+
+CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE habit_categories (
+CREATE TABLE IF NOT EXISTS habit_categories (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     color VARCHAR(20) DEFAULT '#4CAF50'
 );
 
-CREATE TABLE habits (
+CREATE TABLE IF NOT EXISTS habits (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     category_id BIGINT,
@@ -31,7 +39,7 @@ CREATE TABLE habits (
     FOREIGN KEY (category_id) REFERENCES habit_categories(id) ON DELETE SET NULL
 );
 
-CREATE TABLE habit_completions (
+CREATE TABLE IF NOT EXISTS habit_completions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     habit_id BIGINT NOT NULL,
     completion_date DATE NOT NULL,

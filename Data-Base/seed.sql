@@ -1,4 +1,6 @@
-USE progressgrid;
+-- Sample data for a fresh database: run schema.sql first, then this once.
+-- Sign in as admin with the password dummy_hash; it's stored as a proper hash after that first sign-in.
+USE progressgrid_db;
 
 -- Default User
 INSERT INTO users (username, email, password_hash) 
