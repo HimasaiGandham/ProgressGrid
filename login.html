@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>ProgressGrid - Sign In</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="login.css?v=65">
+    <link rel="stylesheet" href="login.css?v=20260922-v99">
 </head>
 <body>
 
@@ -175,6 +178,39 @@
     </div>
 </div>
 
-<script src="login.js?v=70"></script>
+<!-- Inline safeguard to guarantee raw 405 or HTML tags can NEVER be displayed on screen -->
+<script>
+(function() {
+    function sanitizeError(el) {
+        if (!el) return;
+        var txt = el.innerText || el.textContent || '';
+        if (txt.includes('<html') || txt.includes('405') || txt.includes('Not Allowed') || txt.includes('<body') || txt.includes('<center') || txt.includes('<!DOCTYPE')) {
+            el.innerText = 'Incorrect password. Please try again.';
+            el.style.color = '#e74c3c';
+        }
+    }
+
+    function monitor(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var observer = new MutationObserver(function() {
+            sanitizeError(el);
+        });
+        observer.observe(el, { childList: true, characterData: true, subtree: true });
+        sanitizeError(el);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initObservers);
+    } else {
+        initObservers();
+    }
+
+    function initObservers() {
+        ['loginError', 'signupError', 'forgotMsg1', 'forgotMsg2', 'forgotMsg3'].forEach(monitor);
+    }
+})();
+</script>
+<script src="login.js?v=20260922-v99"></script>
 </body>
 </html>
