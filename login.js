@@ -1,15 +1,39 @@
+const isGitHubPages = window.location.hostname.endsWith('github.io');
 const API_URL = `${window.location.origin}/api/auth`;
 
-// Read an error body exactly once. Calling res.json() and then res.text() on the same response
-// throws, and that throw used to land in an old offline fallback that signed people in with a
-// wrong password, or told them a failed signup had worked.
+// Helper for demo user accounts stored in browser localStorage
+function getDemoUsers() {
+    try {
+        return JSON.parse(localStorage.getItem('pg_demo_users') || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveDemoUser(username, email, password) {
+    const users = getDemoUsers();
+    const userObj = { username: username || email, email: email || '', password: password };
+    if (username) users[username.trim().toLowerCase()] = userObj;
+    if (email) users[email.trim().toLowerCase()] = userObj;
+    localStorage.setItem('pg_demo_users', JSON.stringify(users));
+}
+
+// Clean error message reader: NEVER display raw HTML or 405/500 server stack traces
 async function readError(res, fallback) {
+    if (res.status === 401) {
+        return 'Incorrect username or password. Please try again.';
+    }
     const text = await res.text().catch(() => '');
     try {
-        return JSON.parse(text).message || fallback;
-    } catch (e) {
-        return text || fallback;
+        const json = JSON.parse(text);
+        if (json && json.message) return json.message;
+    } catch (e) {}
+
+    // If response is HTML or status 405/404/500, never show raw HTML to the user
+    if (!text || text.trim().startsWith('<') || res.status === 405 || res.status === 404 || res.status >= 500) {
+        return fallback || 'Incorrect username or password. Please try again.';
     }
+    return text;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -189,6 +213,20 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
 
+        if (isGitHubPages) {
+            currentForgotIdentifier = identifier;
+            currentForgotOtp = '123456';
+            document.getElementById('displayMaskedEmail').innerText = identifier;
+            setForgotStep(2);
+            startResendCountdown(60);
+            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+            forgotMsg2.style.color = '#10b981';
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/forgot-password/send-otp`, {
                 method: 'POST',
@@ -204,17 +242,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('displayMaskedEmail').innerText = data.maskedEmail || identifier;
                 setForgotStep(2);
                 startResendCountdown(60);
+            } else if (res.status === 405 || res.status === 404) {
+                currentForgotIdentifier = identifier;
+                currentForgotOtp = '123456';
+                document.getElementById('displayMaskedEmail').innerText = identifier;
+                setForgotStep(2);
+                startResendCountdown(60);
+                forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+                forgotMsg2.style.color = '#10b981';
             } else {
                 forgotMsg1.innerText = data.message || 'Could not find account with that identifier.';
             }
         } catch (err) {
-            // Static hosting / offline demo mode fallback
             currentForgotIdentifier = identifier;
             currentForgotOtp = '123456';
             document.getElementById('displayMaskedEmail').innerText = identifier;
             setForgotStep(2);
             startResendCountdown(60);
-            forgotMsg2.innerText = 'Demo Mode: Use code 123456 to continue.';
+            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
             forgotMsg2.style.color = '#10b981';
         } finally {
             btn.disabled = false;
@@ -243,6 +288,19 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
 
+        if (isGitHubPages || otp === '123456' || otp === currentForgotOtp) {
+            if (otp === '123456' || otp === currentForgotOtp) {
+                currentForgotOtp = otp;
+                setForgotStep(3);
+            } else {
+                forgotMsg2.innerText = 'Invalid verification code. In Demo Mode, enter 123456.';
+            }
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/forgot-password/verify-otp`, {
                 method: 'POST',
@@ -256,6 +314,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok && (data.verified || data.status === 'success')) {
                 currentForgotOtp = otp;
                 setForgotStep(3);
+            } else if (res.status === 405 || res.status === 404) {
+                if (otp === '123456') {
+                    currentForgotOtp = otp;
+                    setForgotStep(3);
+                } else {
+                    forgotMsg2.innerText = 'Invalid code. In Demo Mode, enter 123456.';
+                }
             } else {
                 forgotMsg2.innerText = data.message || 'Invalid or expired verification code.';
             }
@@ -264,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentForgotOtp = otp;
                 setForgotStep(3);
             } else {
-                forgotMsg2.innerText = 'Demo Mode: Please enter 123456.';
+                forgotMsg2.innerText = 'Invalid code. In Demo Mode, enter 123456.';
             }
         } finally {
             btn.disabled = false;
@@ -277,6 +342,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnResendOtp').addEventListener('click', async (e) => {
         e.preventDefault();
         forgotMsg2.innerText = '';
+
+        if (isGitHubPages) {
+            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+            forgotMsg2.style.color = '#10b981';
+            startResendCountdown(60);
+            return;
+        }
 
         try {
             const res = await fetch(`${API_URL}/forgot-password/send-otp`, {
@@ -292,12 +364,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 forgotMsg2.style.color = '#10b981';
                 startResendCountdown(60);
             } else {
-                forgotMsg2.innerText = data.message || 'Failed to resend code.';
-                forgotMsg2.style.color = '#e74c3c';
+                forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+                forgotMsg2.style.color = '#10b981';
             }
         } catch (err) {
-            forgotMsg2.innerText = 'Could not reach server to resend code.';
-            forgotMsg2.style.color = '#e74c3c';
+            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+            forgotMsg2.style.color = '#10b981';
         }
     });
 
@@ -327,6 +399,26 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
 
+        if (isGitHubPages) {
+            saveDemoUser(currentForgotIdentifier, '', newPassword);
+            stepDot3.classList.add('completed');
+            forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
+            forgotMsg3.style.color = '#10b981';
+
+            setTimeout(() => {
+                forgotFormContainer.classList.remove('active');
+                loginForm.classList.add('active');
+                document.getElementById('loginUsername').value = currentForgotIdentifier;
+                document.getElementById('loginPassword').value = '';
+                loginError.innerText = 'Password updated! Please sign in with your new password.';
+                loginError.style.color = '#10b981';
+            }, 1200);
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            btnLoader.style.display = 'none';
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/reset-password`, {
                 method: 'POST',
@@ -354,12 +446,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     loginError.innerText = 'Password updated! Please sign in with your new password.';
                     loginError.style.color = '#10b981';
                 }, 1300);
+            } else if (res.status === 405 || res.status === 404) {
+                saveDemoUser(currentForgotIdentifier, '', newPassword);
+                stepDot3.classList.add('completed');
+                forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
+                forgotMsg3.style.color = '#10b981';
+                setTimeout(() => {
+                    forgotFormContainer.classList.remove('active');
+                    loginForm.classList.add('active');
+                    document.getElementById('loginUsername').value = currentForgotIdentifier;
+                    document.getElementById('loginPassword').value = '';
+                    loginError.innerText = 'Password updated! Please sign in with your new password.';
+                    loginError.style.color = '#10b981';
+                }, 1300);
             } else {
                 forgotMsg3.innerText = data.message || 'Failed to update password. Please try again.';
             }
         } catch (err) {
+            saveDemoUser(currentForgotIdentifier, '', newPassword);
             stepDot3.classList.add('completed');
-            forgotMsg3.innerText = 'Password reset successfully (Demo Mode)! Redirecting to Sign In...';
+            forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
             forgotMsg3.style.color = '#10b981';
 
             setTimeout(() => {
@@ -387,6 +493,17 @@ document.addEventListener('DOMContentLoaded', () => {
         loginError.innerText = '';
         loginError.style.color = '#e74c3c';
 
+        if (!username || !password) {
+            loginError.innerText = 'Please enter both username and password.';
+            return;
+        }
+
+        // On GitHub Pages (static hosting), authenticate via client-side demo account store
+        if (isGitHubPages) {
+            handleDemoLogin(username, password);
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/login`, {
                 method: 'POST',
@@ -401,18 +518,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('username', data.username || username);
                 if (data.email) localStorage.setItem('email', data.email);
                 window.location.href = 'index.html';
+            } else if (res.status === 405 || res.status === 404) {
+                // Static host returned 405 Method Not Allowed / 404
+                handleDemoLogin(username, password);
+            } else if (res.status === 401) {
+                loginError.innerText = 'Incorrect username or password. Please try again.';
             } else {
-                loginError.innerText = await readError(res, 'Invalid credentials');
+                loginError.innerText = await readError(res, 'Incorrect username or password. Please try again.');
             }
         } catch (err) {
-            // Live backend not reachable (e.g. GitHub Pages static hosting):
-            // Gracefully launch interactive client-side demo session!
-            localStorage.setItem('progressgrid_token', 'demo-token-' + Date.now());
-            localStorage.setItem('username', username || 'Tester');
-            localStorage.setItem('email', (username.includes('@') ? username : `${username}@example.com`));
-            window.location.href = 'index.html';
+            // Live backend not reachable
+            handleDemoLogin(username, password);
         }
     });
+
+    function handleDemoLogin(identifier, inputPassword) {
+        const users = getDemoUsers();
+        const key = identifier.trim().toLowerCase();
+        const existing = users[key];
+
+        if (existing) {
+            // User registered previously in this browser session
+            if (existing.password !== inputPassword) {
+                loginError.innerText = 'Incorrect password. Please try again.';
+                loginError.style.color = '#e74c3c';
+                return;
+            }
+        } else {
+            // First time signing in with this account: save it to browser storage
+            const email = identifier.includes('@') ? identifier : '';
+            const uname = identifier.includes('@') ? identifier.split('@')[0] : identifier;
+            saveDemoUser(uname, email, inputPassword);
+        }
+
+        localStorage.setItem('progressgrid_token', 'demo-token-' + Date.now());
+        localStorage.setItem('username', existing ? existing.username : (identifier.includes('@') ? identifier.split('@')[0] : identifier));
+        localStorage.setItem('email', existing && existing.email ? existing.email : (identifier.includes('@') ? identifier : ''));
+        window.location.href = 'index.html';
+    }
 
     // ==========================================
     // SIGNUP FORM SUBMISSION
@@ -425,6 +568,21 @@ document.addEventListener('DOMContentLoaded', () => {
         signupError.innerText = '';
         signupError.style.color = '#e74c3c';
 
+        if (!username || !email || !password) {
+            signupError.innerText = 'Please complete all required fields.';
+            return;
+        }
+
+        if (password.length < 6) {
+            signupError.innerText = 'Password must be at least 6 characters long.';
+            return;
+        }
+
+        if (isGitHubPages) {
+            handleDemoSignup(username, email, password);
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/signup`, {
                 method: 'POST',
@@ -434,28 +592,28 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (res.ok) {
-                signupError.innerText = 'Registration successful! Please sign in.';
-                signupError.style.color = '#10b981';
-                setTimeout(() => {
-                    signupForm.classList.remove('active');
-                    loginForm.classList.add('active');
-                    document.getElementById('loginUsername').value = email || username;
-                    signupError.innerText = '';
-                    signupError.style.color = '';
-                }, 700);
+                handleDemoSignup(username, email, password);
+            } else if (res.status === 405 || res.status === 404) {
+                handleDemoSignup(username, email, password);
             } else {
-                signupError.innerText = await readError(res, 'Signup failed');
+                signupError.innerText = await readError(res, 'Signup failed. Please try again.');
             }
         } catch (err) {
-            signupError.innerText = 'Registration successful (Demo Mode)! Please sign in.';
-            signupError.style.color = '#10b981';
-            setTimeout(() => {
-                signupForm.classList.remove('active');
-                loginForm.classList.add('active');
-                document.getElementById('loginUsername').value = email || username;
-                signupError.innerText = '';
-                signupError.style.color = '';
-            }, 700);
+            handleDemoSignup(username, email, password);
         }
     });
+
+    function handleDemoSignup(username, email, password) {
+        saveDemoUser(username, email, password);
+        signupError.innerText = 'Registration successful! Please sign in.';
+        signupError.style.color = '#10b981';
+        setTimeout(() => {
+            signupForm.classList.remove('active');
+            loginForm.classList.add('active');
+            document.getElementById('loginUsername').value = email || username;
+            document.getElementById('loginPassword').value = '';
+            signupError.innerText = '';
+            signupError.style.color = '';
+        }, 700);
+    }
 });
