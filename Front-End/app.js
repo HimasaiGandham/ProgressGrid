@@ -62,22 +62,94 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchHabits();
     }
 
+    // Local storage helpers for static hosting & client-side demo mode
+    function getDefaultHabits() {
+        const today = formatDateIso(new Date());
+        const d1 = formatDateIso(new Date(Date.now() - 86400000));
+        const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
+        const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
+        return [
+            {
+                id: 101,
+                name: 'Morning Workout & Stretch',
+                category: 'Health',
+                frequency: 'DAILY',
+                startDate: d3,
+                currentStreak: 3,
+                bestStreak: 5,
+                completionPercentage: 85,
+                completions: [today, d1, d2]
+            },
+            {
+                id: 102,
+                name: 'Read 20 Pages',
+                category: 'Productivity',
+                frequency: 'DAILY',
+                startDate: d3,
+                currentStreak: 4,
+                bestStreak: 8,
+                completionPercentage: 100,
+                completions: [today, d1, d2, d3]
+            },
+            {
+                id: 103,
+                name: 'Drink 2.5L Water',
+                category: 'Health',
+                frequency: 'DAILY',
+                startDate: d2,
+                currentStreak: 2,
+                bestStreak: 4,
+                completionPercentage: 75,
+                completions: [today, d1]
+            },
+            {
+                id: 104,
+                name: 'Weekly Planning & Review',
+                category: 'Work',
+                frequency: 'WEEKLY',
+                startDate: d3,
+                currentStreak: 1,
+                bestStreak: 3,
+                completionPercentage: 100,
+                completions: [today]
+            }
+        ];
+    }
+
+    function getStoredHabits() {
+        const raw = localStorage.getItem('pg_demo_habits');
+        if (raw) {
+            try { return JSON.parse(raw); } catch(e) {}
+        }
+        const defaults = getDefaultHabits();
+        saveStoredHabits(defaults);
+        return defaults;
+    }
+
+    function saveStoredHabits(list) {
+        localStorage.setItem('pg_demo_habits', JSON.stringify(list));
+    }
+
     // One place for the session token, the request timeout and what a 401 means.
     async function api(path, options = {}) {
-        const res = await fetch(API_URL + path, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('progressgrid_token')
-            },
-            signal: AbortSignal.timeout(8000)
-        });
-        if (res.status === 401) {
-            // Missing or expired session: sign in again.
-            localStorage.clear();
-            window.location.href = 'login.html';
+        try {
+            const res = await fetch(API_URL + path, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('progressgrid_token')
+                },
+                signal: AbortSignal.timeout(3500)
+            });
+            if (res.status === 401 && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+                // Missing or expired session: sign in again.
+                localStorage.clear();
+                window.location.href = 'login.html';
+            }
+            return res;
+        } catch (err) {
+            return null;
         }
-        return res;
     }
 
     function initProfileData() {
@@ -309,11 +381,30 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             if (!habit.name) return;
 
-            const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
-            if (!res || !res.ok) {
-                alert("Couldn't save the habit. Check that the backend is running and try again.");
-                return;
+            let savedOnServer = false;
+            try {
+                const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
+                if (res && res.ok) {
+                    savedOnServer = true;
+                }
+            } catch (err) {}
+
+            if (!savedOnServer) {
+                const current = getStoredHabits();
+                current.push({
+                    id: Date.now(),
+                    name: habit.name,
+                    category: habit.category,
+                    frequency: habit.frequency,
+                    startDate: habit.startDate,
+                    currentStreak: 0,
+                    bestStreak: 0,
+                    completionPercentage: 0,
+                    completions: []
+                });
+                saveStoredHabits(current);
             }
+
             addHabitForm.reset();
             addHabitModal.classList.remove('active');
             fetchHabits();
@@ -324,16 +415,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const cell = e.target.closest('td[data-habit]');
             if (!cell) return;
             const habit = habits.find(h => h.id === Number(cell.dataset.habit));
+            if (!habit) return;
             const date = cell.dataset.date;
             const completed = !habit.completionsSet.has(date);
 
-            // Show the tick straight away, then reload: streaks and percentages are worked out on
-            // the server, and reloading also puts the box back if saving failed.
+            // Show the tick straight away, then update storage & server
             if (completed) habit.completionsSet.add(date);
             else habit.completionsSet.delete(date);
+            habit.completions = Array.from(habit.completionsSet);
+
+            // Update in stored list for client-side demo resilience
+            const currentList = getStoredHabits();
+            const storedIndex = currentList.findIndex(h => h.id === habit.id);
+            if (storedIndex !== -1) {
+                currentList[storedIndex].completions = habit.completions;
+                currentList[storedIndex].currentStreak = habit.completions.length;
+                currentList[storedIndex].bestStreak = Math.max(currentList[storedIndex].bestStreak || 0, habit.completions.length);
+                currentList[storedIndex].completionPercentage = habit.completions.length > 0 ? Math.min(100, habit.completions.length * 20) : 0;
+                saveStoredHabits(currentList);
+            }
+
             renderDashboard();
             await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
-            fetchHabits();
         });
 
         // Navigation
@@ -348,14 +451,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchHabits() {
+        let loadedFromServer = false;
         try {
             const res = await api('');
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            habits = await res.json();
-            loadFailed = false;
+            if (res && res.ok) {
+                habits = await res.json();
+                loadedFromServer = true;
+                saveStoredHabits(habits);
+                loadFailed = false;
+            }
         } catch (e) {
-            habits = [];
-            loadFailed = true;
+            // Live backend unavailable (e.g. on GitHub Pages static hosting)
+        }
+
+        if (!loadedFromServer) {
+            habits = getStoredHabits();
+            loadFailed = false;
         }
 
         habits.forEach(h => {
