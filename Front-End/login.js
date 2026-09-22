@@ -1,13 +1,29 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io');
+const isGitHubPages = window.location.hostname.endsWith('github.io') || 
+                      window.location.protocol === 'file:' || 
+                      (!window.location.port || (window.location.port !== '8080' && window.location.port !== '3000'));
 const API_URL = `${window.location.origin}/api/auth`;
 
 // Helper for demo user accounts stored in browser localStorage
 function getDemoUsers() {
+    let users = {};
     try {
-        return JSON.parse(localStorage.getItem('pg_demo_users') || '{}');
+        users = JSON.parse(localStorage.getItem('pg_demo_users') || '{}');
     } catch (e) {
-        return {};
+        users = {};
     }
+    // Pre-seed primary verified account so it's always recognized
+    const primary = {
+        username: 'himasaigandham277',
+        email: 'himasaigandham277@gmail.com',
+        password: 'iasiasiasiasias9988'
+    };
+    if (!users['himasaigandham277@gmail.com']) {
+        users['himasaigandham277@gmail.com'] = primary;
+    }
+    if (!users['himasaigandham277']) {
+        users['himasaigandham277'] = primary;
+    }
+    return users;
 }
 
 function saveDemoUser(username, email, password) {
@@ -20,20 +36,24 @@ function saveDemoUser(username, email, password) {
 
 // Clean error message reader: NEVER display raw HTML or 405/500 server stack traces
 async function readError(res, fallback) {
-    if (res.status === 401) {
-        return 'Incorrect username or password. Please try again.';
+    const defaultMsg = fallback || 'Incorrect password. Please try again.';
+    if (!res) return defaultMsg;
+    if (res.status === 401 || res.status === 405 || res.status === 404 || res.status >= 500) {
+        return defaultMsg;
     }
-    const text = await res.text().catch(() => '');
     try {
-        const json = JSON.parse(text);
-        if (json && json.message) return json.message;
-    } catch (e) {}
-
-    // If response is HTML or status 405/404/500, never show raw HTML to the user
-    if (!text || text.trim().startsWith('<') || res.status === 405 || res.status === 404 || res.status >= 500) {
-        return fallback || 'Incorrect username or password. Please try again.';
+        const text = await res.text().catch(() => '');
+        if (!text || text.includes('<html') || text.includes('405') || text.includes('Not Allowed') || text.includes('<!DOCTYPE') || text.includes('<body') || text.includes('<center')) {
+            return defaultMsg;
+        }
+        try {
+            const json = JSON.parse(text);
+            if (json && json.message) return json.message;
+        } catch (e) {}
+        return text;
+    } catch (e) {
+        return defaultMsg;
     }
-    return text;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
