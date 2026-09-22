@@ -16,3 +16,4 @@ scratch_last.txt
 # Local secrets & overrides
 .env
 *-local.properties
+cloudflared*
