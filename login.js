@@ -99,24 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentForgotOtp = '';
     let resendInterval = null;
 
-    const demoTesterBanner = document.getElementById('demoTesterBanner');
-    const btnQuickDemo = document.getElementById('btnQuickDemo');
-
-    if (btnQuickDemo) {
-        btnQuickDemo.addEventListener('click', (e) => {
-            e.preventDefault();
-            localStorage.setItem('progressgrid_token', 'demo-token-' + Date.now());
-            localStorage.setItem('username', 'himasaigandham277');
-            localStorage.setItem('email', 'himasaigandham277@gmail.com');
-            window.location.href = 'index.html';
-        });
-    }
-
     showSignup.addEventListener('click', (e) => {
         e.preventDefault();
         loginForm.classList.remove('active');
         if (forgotFormContainer) forgotFormContainer.classList.remove('active');
-        if (demoTesterBanner) demoTesterBanner.style.display = 'none';
         signupForm.classList.add('active');
         loginError.innerText = '';
         signupError.innerText = '';
@@ -126,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         signupForm.classList.remove('active');
         if (forgotFormContainer) forgotFormContainer.classList.remove('active');
-        if (demoTesterBanner) demoTesterBanner.style.display = 'block';
         loginForm.classList.add('active');
         loginError.innerText = '';
     });
@@ -218,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         loginForm.classList.remove('active');
         signupForm.classList.remove('active');
-        if (demoTesterBanner) demoTesterBanner.style.display = 'none';
         forgotFormContainer.classList.add('active');
         
         // Reset messages & inputs
@@ -231,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelForgot.addEventListener('click', (e) => {
         e.preventDefault();
         forgotFormContainer.classList.remove('active');
-        if (demoTesterBanner) demoTesterBanner.style.display = 'block';
         loginForm.classList.add('active');
         if (resendInterval) clearInterval(resendInterval);
     });
@@ -583,11 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (existing) {
             // User registered previously in this browser session
             if (existing.password !== inputPassword) {
-                if (key === 'himasaigandham277' || key === 'himasaigandham277@gmail.com') {
-                    loginError.innerText = 'Incorrect password. Demo password: iasiasiasiasias9988 (or use 1-Click Test Sign-In above).';
-                } else {
-                    loginError.innerText = 'Incorrect password. Please try again.';
-                }
+                loginError.innerText = 'Incorrect password. Please try again.';
                 loginError.style.color = '#e74c3c';
                 return;
             }
