@@ -1,7 +1,8 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io') || 
-                      window.location.protocol === 'file:' || 
-                      (!window.location.port || (window.location.port !== '8080' && window.location.port !== '3000'));
-const API_URL = `${window.location.origin}/api/habits`;
+const isGitHubPages = window.location.hostname.endsWith('github.io');
+const BACKEND_BASE = (window.location.port === '3000' || window.location.port === '8080')
+    ? window.location.origin
+    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : window.location.origin);
+const API_URL = `${BACKEND_BASE}/api/habits`;
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -149,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (res.status === 401 && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
                 // Missing or expired session: sign in again.
-                localStorage.clear();
+                localStorage.removeItem('progressgrid_token');
                 window.location.href = 'login.html';
             }
             return res;
@@ -384,7 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (logoutBtn) {
             logoutBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                localStorage.clear();
+                localStorage.removeItem('progressgrid_token');
+                localStorage.removeItem('username');
+                localStorage.removeItem('email');
                 window.location.href = 'login.html?logout=true';
             });
         }
@@ -439,8 +442,26 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchHabits();
         });
 
-        // Ticking a day: one listener on the table instead of one per cell on every render.
+        // Ticking a day or deleting a habit
         habitTableBody.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.btn-delete-habit');
+            if (deleteBtn) {
+                const habitId = Number(deleteBtn.dataset.habitId);
+                const habit = habits.find(h => h.id === habitId);
+                const habitName = habit ? habit.name : 'this habit';
+                if (!confirm(`Are you sure you want to delete "${habitName}"?`)) return;
+
+                habits = habits.filter(h => h.id !== habitId);
+                const currentList = getStoredHabits().filter(h => h.id !== habitId);
+                saveStoredHabits(currentList);
+                renderDashboard();
+
+                if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+                    await api(`/${habitId}`, { method: 'DELETE' }).catch(() => {});
+                }
+                return;
+            }
+
             const cell = e.target.closest('td[data-habit]');
             if (!cell) return;
             const habit = habits.find(h => h.id === Number(cell.dataset.habit));
@@ -556,8 +577,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return `<tr class="habit-row">
                 <td class="habit-name">
-                    <strong>${esc(habit.name)}</strong><br>
-                    <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
+                    <div class="habit-name-wrapper">
+                        <div class="habit-name-text">
+                            <strong>${esc(habit.name)}</strong><br>
+                            <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
+                        </div>
+                        <button class="btn-delete-habit" data-habit-id="${habit.id}" title="Delete ${esc(habit.name)}">×</button>
+                    </div>
                 </td>${cells}</tr>`;
         }).join('');
     }
