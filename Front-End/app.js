@@ -439,27 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchHabits();
         });
 
-        // Ticking a day or deleting a habit: listeners on the table
+        // Ticking a day: one listener on the table instead of one per cell on every render.
         habitTableBody.addEventListener('click', async (e) => {
-            // Delete habit action
-            const delBtn = e.target.closest('.btn-delete-habit');
-            if (delBtn) {
-                const habitId = Number(delBtn.dataset.id);
-                const habitToDelete = habits.find(h => h.id === habitId);
-                const habitName = habitToDelete ? habitToDelete.name : 'this habit';
-                if (!confirm(`Are you sure you want to delete "${habitName}"?`)) return;
-
-                habits = habits.filter(h => h.id !== habitId);
-                const currentList = getStoredHabits().filter(h => h.id !== habitId);
-                saveStoredHabits(currentList);
-                renderDashboard();
-
-                if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                    await api(`/${habitId}`, { method: 'DELETE' }).catch(() => {});
-                }
-                return;
-            }
-
             const cell = e.target.closest('td[data-habit]');
             if (!cell) return;
             const habit = habits.find(h => h.id === Number(cell.dataset.habit));
@@ -575,13 +556,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return `<tr class="habit-row">
                 <td class="habit-name">
-                    <div class="habit-name-wrapper">
-                        <div class="habit-name-text">
-                            <strong>${esc(habit.name)}</strong><br>
-                            <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
-                        </div>
-                        <button class="btn-delete-habit" data-id="${habit.id}" title="Delete Habit" aria-label="Delete ${esc(habit.name)}">&times;</button>
-                    </div>
+                    <strong>${esc(habit.name)}</strong><br>
+                    <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
                 </td>${cells}</tr>`;
         }).join('');
     }
