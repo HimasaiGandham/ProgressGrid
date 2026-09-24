@@ -365,6 +365,40 @@ body {
     min-width: 150px;
 }
 
+.habit-name-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.habit-name-text {
+    flex: 1;
+}
+
+.btn-delete-habit {
+    opacity: 0.25;
+    background: transparent;
+    border: none;
+    color: #e74c3c;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 2px 6px;
+    transition: all 0.2s ease;
+}
+
+.habit-row:hover .btn-delete-habit {
+    opacity: 0.8;
+}
+
+.btn-delete-habit:hover {
+    opacity: 1 !important;
+    background: rgba(231, 76, 60, 0.15);
+    transform: scale(1.15);
+}
+
 .check-cell {
     width: 40px;
     height: 40px;

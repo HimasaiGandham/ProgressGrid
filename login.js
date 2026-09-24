@@ -1,7 +1,8 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io') || 
-                      window.location.protocol === 'file:' || 
-                      (!window.location.port || (window.location.port !== '8080' && window.location.port !== '3000'));
-const API_URL = `${window.location.origin}/api/auth`;
+const isGitHubPages = window.location.hostname.endsWith('github.io');
+const BACKEND_BASE = (window.location.port === '3000' || window.location.port === '8080')
+    ? window.location.origin
+    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : window.location.origin);
+const API_URL = `${BACKEND_BASE}/api/auth`;
 
 // Helper for demo user accounts stored in browser localStorage
 function getDemoUsers() {
@@ -57,9 +58,14 @@ async function readError(res, fallback) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Arriving from the logout button: drop the session.
+    // Arriving from the logout button: drop the session but preserve user habits and demo accounts.
     if (new URLSearchParams(window.location.search).get('logout') === 'true') {
-        localStorage.clear();
+        localStorage.removeItem('progressgrid_token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('email');
+        localStorage.removeItem('userFullName');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userMobile');
     }
 
     const loginForm = document.getElementById('loginForm');
