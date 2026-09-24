@@ -16,4 +16,6 @@ scratch_last.txt
 # Local secrets & overrides
 .env
 *-local.properties
-cloudflared*
+cloudflared*
+__pycache__/
+*.py[cod]
