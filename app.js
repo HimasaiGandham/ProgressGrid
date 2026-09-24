@@ -1,3 +1,6 @@
+const isGitHubPages = window.location.hostname.endsWith('github.io') || 
+                      window.location.protocol === 'file:' || 
+                      (!window.location.port || (window.location.port !== '8080' && window.location.port !== '3000'));
 const API_URL = `${window.location.origin}/api/habits`;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -132,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // One place for the session token, the request timeout and what a 401 means.
     async function api(path, options = {}) {
+        if (isGitHubPages || localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+            return null;
+        }
         try {
             const res = await fetch(API_URL + path, {
                 ...options,
@@ -241,31 +247,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 showProfile();
             });
         }
+        // Sidebar Nav links: switch views and smoothly scroll to active sections
         if (navDashboard) {
             navDashboard.addEventListener('click', (e) => {
                 e.preventDefault();
+                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+                navDashboard.classList.add('active');
                 showDashboard();
-            });
-        }
-        if (backToDashboardBtn) {
-            backToDashboardBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                showDashboard();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         }
 
-        // Other Nav links (their pages don't exist yet, so they show the dashboard)
-        ['navHabits', 'navStats', 'navCalendar'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-                    el.classList.add('active');
-                    showDashboard();
-                });
-            }
-        });
+        const navHabits = document.getElementById('navHabits');
+        if (navHabits) {
+            navHabits.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+                navHabits.classList.add('active');
+                showDashboard();
+                const gridSection = document.querySelector('.habit-grid-section');
+                if (gridSection) gridSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        const navStats = document.getElementById('navStats');
+        if (navStats) {
+            navStats.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+                navStats.classList.add('active');
+                showDashboard();
+                const chartCard = document.querySelector('.weekly-chart-card') || document.querySelector('.summary-cards');
+                if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        const navCalendar = document.getElementById('navCalendar');
+        if (navCalendar) {
+            navCalendar.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+                navCalendar.classList.add('active');
+                showDashboard();
+                const weekNav = document.querySelector('.week-nav');
+                if (weekNav) weekNav.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        }
 
         // Photo Upload via File Explorer
         if (profileAvatarLarge) {
@@ -382,12 +409,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!habit.name) return;
 
             let savedOnServer = false;
-            try {
-                const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
-                if (res && res.ok) {
-                    savedOnServer = true;
-                }
-            } catch (err) {}
+            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+                try {
+                    const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
+                    if (res && res.ok) {
+                        savedOnServer = true;
+                    }
+                } catch (err) {}
+            }
 
             if (!savedOnServer) {
                 const current = getStoredHabits();
@@ -410,8 +439,27 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchHabits();
         });
 
-        // Ticking a day: one listener on the table instead of one per cell on every render.
+        // Ticking a day or deleting a habit: listeners on the table
         habitTableBody.addEventListener('click', async (e) => {
+            // Delete habit action
+            const delBtn = e.target.closest('.btn-delete-habit');
+            if (delBtn) {
+                const habitId = Number(delBtn.dataset.id);
+                const habitToDelete = habits.find(h => h.id === habitId);
+                const habitName = habitToDelete ? habitToDelete.name : 'this habit';
+                if (!confirm(`Are you sure you want to delete "${habitName}"?`)) return;
+
+                habits = habits.filter(h => h.id !== habitId);
+                const currentList = getStoredHabits().filter(h => h.id !== habitId);
+                saveStoredHabits(currentList);
+                renderDashboard();
+
+                if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+                    await api(`/${habitId}`, { method: 'DELETE' }).catch(() => {});
+                }
+                return;
+            }
+
             const cell = e.target.closest('td[data-habit]');
             if (!cell) return;
             const habit = habits.find(h => h.id === Number(cell.dataset.habit));
@@ -436,7 +484,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             renderDashboard();
-            await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
+            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+                await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
+            }
         });
 
         // Navigation
@@ -452,16 +502,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchHabits() {
         let loadedFromServer = false;
-        try {
-            const res = await api('');
-            if (res && res.ok) {
-                habits = await res.json();
-                loadedFromServer = true;
-                saveStoredHabits(habits);
-                loadFailed = false;
+        if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+            try {
+                const res = await api('');
+                if (res && res.ok) {
+                    habits = await res.json();
+                    loadedFromServer = true;
+                    saveStoredHabits(habits);
+                    loadFailed = false;
+                }
+            } catch (e) {
+                // Live backend unavailable (e.g. on GitHub Pages static hosting)
             }
-        } catch (e) {
-            // Live backend unavailable (e.g. on GitHub Pages static hosting)
         }
 
         if (!loadedFromServer) {
@@ -523,8 +575,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return `<tr class="habit-row">
                 <td class="habit-name">
-                    <strong>${esc(habit.name)}</strong><br>
-                    <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
+                    <div class="habit-name-wrapper">
+                        <div class="habit-name-text">
+                            <strong>${esc(habit.name)}</strong><br>
+                            <small style="color:var(--text-muted)">${esc(habit.category)} • ${isWeekly(habit) ? 'Weekly' : 'Daily'} • From ${startLabel}</small>
+                        </div>
+                        <button class="btn-delete-habit" data-id="${habit.id}" title="Delete Habit" aria-label="Delete ${esc(habit.name)}">&times;</button>
+                    </div>
                 </td>${cells}</tr>`;
         }).join('');
     }
