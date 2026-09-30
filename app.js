@@ -536,9 +536,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const storedIndex = currentList.findIndex(h => h.id === habit.id);
             if (storedIndex !== -1) {
                 currentList[storedIndex].completions = habit.completions;
-                currentList[storedIndex].currentStreak = habit.completions.length;
-                currentList[storedIndex].bestStreak = Math.max(currentList[storedIndex].bestStreak || 0, habit.completions.length);
-                currentList[storedIndex].completionPercentage = habit.completions.length > 0 ? Math.min(100, habit.completions.length * 20) : 0;
+                recalculateHabitStats(currentList[storedIndex]);
+                habit.currentStreak = currentList[storedIndex].currentStreak;
+                habit.bestStreak = currentList[storedIndex].bestStreak;
+                habit.completionPercentage = currentList[storedIndex].completionPercentage;
                 saveStoredHabits(currentList);
             }
 
@@ -583,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
         habits.forEach(h => {
             h.completionsSet = new Set(h.completions || []);
             h.start = String(h.startDate || formatDateIso(new Date())).split('T')[0];
+            recalculateHabitStats(h);
         });
         renderDashboard();
         if (statsView && statsView.style.display !== 'none') {
@@ -1461,6 +1463,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.style.display = 'none';
             }
         });
+    }
+
+    // ==========================================
+    // STATS CALCULATION LOGIC
+    // ==========================================
+    function recalculateHabitStats(habit) {
+        const weekly = isWeekly(habit);
+        const step = weekly ? 7 : 1;
+        const now = periodOf(new Date(), weekly);
+        const first = periodOf(new Date(habit.startDate || new Date()), weekly);
+        
+        const doneSet = new Set();
+        (habit.completions || []).forEach(dStr => {
+            const d = new Date(dStr);
+            if (isNaN(d.getTime())) return;
+            const p = periodOf(d, weekly);
+            if (p >= first && p <= now) {
+                doneSet.add(p.getTime());
+            }
+        });
+        
+        const done = Array.from(doneSet).sort((a, b) => a - b);
+        
+        let best = 0;
+        let run = 0;
+        let previous = null;
+        
+        done.forEach(time => {
+            const period = new Date(time);
+            if (previous !== null) {
+                const diffTime = period.getTime() - previous.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+                if (diffDays === step) {
+                    run += 1;
+                } else {
+                    run = 1;
+                }
+            } else {
+                run = 1;
+            }
+            if (run > best) best = run;
+            previous = period;
+        });
+        
+        let current = 0;
+        if (done.length > 0) {
+            const lastTime = done[done.length - 1];
+            const diffTime = now.getTime() - lastTime;
+            const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+            if (diffDays === 0 || diffDays === step) {
+                current = run;
+            }
+        }
+        
+        let totalPeriods = Math.floor(Math.round((now.getTime() - first.getTime()) / (1000 * 3600 * 24)) / step) + 1;
+        if (totalPeriods < 1) totalPeriods = 1;
+        let pct = Math.round((done.length * 100) / totalPeriods);
+        if (pct > 100) pct = 100;
+        
+        habit.currentStreak = current;
+        habit.bestStreak = best;
+        habit.completionPercentage = pct;
+    }
+
+    function periodOf(date, weekly) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        if (weekly) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+        }
+        return d;
     }
 
     // ==========================================
