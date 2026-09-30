@@ -350,6 +350,44 @@
             </section>
         </div>
 
+        <!-- TAB VIEW 4: CALENDAR VIEW -->
+        <div id="calendarView" class="tab-view" style="display: none;">
+            <!-- HEADER -->
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1>Habit Calendar</h1>
+                    <p>Select a date to view your habits and progress</p>
+                </div>
+            </header>
+            
+            <div class="calendar-container">
+                <div class="card calendar-card">
+                    <div class="calendar-header">
+                        <button id="calPrevMonth" class="btn-icon"><span class="icon">chevron_left</span></button>
+                        <h2 id="calMonthYear">September 2026</h2>
+                        <button id="calNextMonth" class="btn-icon"><span class="icon">chevron_right</span></button>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="cal-day-name">Sun</div>
+                        <div class="cal-day-name">Mon</div>
+                        <div class="cal-day-name">Tue</div>
+                        <div class="cal-day-name">Wed</div>
+                        <div class="cal-day-name">Thu</div>
+                        <div class="cal-day-name">Fri</div>
+                        <div class="cal-day-name">Sat</div>
+                        <!-- Calendar days injected by JS -->
+                    </div>
+                </div>
+
+                <div class="card calendar-details-card">
+                    <h3 id="calSelectedDateText">Selected Date Habits</h3>
+                    <div id="calDayHabitsList" class="day-habits-list">
+                        <p class="text-muted">Select a day on the calendar to see habits.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB VIEW 3: PROFILE SETTINGS VIEW -->
         <div id="profileView" class="tab-view" style="display: none;">
             <!-- HEADER -->
