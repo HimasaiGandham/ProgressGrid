@@ -144,7 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...options,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('progressgrid_token')
+                    'Authorization': 'Bearer ' + localStorage.getItem('progressgrid_token'),
+                    // So the server checks ticks against the user's today, not its own.
+                    'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone || ''
                 },
                 signal: AbortSignal.timeout(3500)
             });

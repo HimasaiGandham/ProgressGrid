@@ -10,9 +10,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,13 +60,20 @@ class HabitRulesTests {
     }
 
     private ResultActions tick(String token, long habitId, LocalDate date) throws Exception {
+        return tick(token, habitId, date, null);
+    }
+
+    private ResultActions tick(String token, long habitId, LocalDate date, String timeZone) throws Exception {
         Map<String, Object> body = new HashMap<>();
         body.put("completed", true);
         if (date != null) {
             body.put("date", date.toString());
         }
-        return mvc.perform(post("/api/habits/" + habitId + "/complete").header("Authorization", token)
-                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)));
+        MockHttpServletRequestBuilder request = post("/api/habits/" + habitId + "/complete").header("Authorization", token);
+        if (timeZone != null) {
+            request.header("X-Timezone", timeZone);
+        }
+        return mvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)));
     }
 
     private JsonNode habit(String token, long habitId) throws Exception {
@@ -94,6 +103,21 @@ class HabitRulesTests {
         tick(token, id, null).andExpect(status().isBadRequest());
         tick(token, id, TODAY.minusDays(3)).andExpect(status().isOk());
         tick(token, id, TODAY).andExpect(status().isOk());
+    }
+
+    @Test
+    void todayIsTheUsersTodayNotTheServers() throws Exception {
+        String token = signUp();
+        long id = habitStarting(token, TODAY.minusDays(3), "Daily");
+        // UTC+14 and UTC-11 are 25 hours apart, so these are always different dates.
+        LocalDate kiritimatiToday = LocalDate.now(ZoneId.of("Pacific/Kiritimati"));
+
+        // Already the next day for this user: their today is accepted...
+        tick(token, id, kiritimatiToday, "Pacific/Kiritimati").andExpect(status().isOk());
+        // ...but it is still the future for someone whose day hasn't turned yet.
+        tick(token, id, kiritimatiToday, "Pacific/Pago_Pago").andExpect(status().isBadRequest());
+        // An unknown timezone falls back to the server's date.
+        tick(token, id, TODAY, "Not/A_Zone").andExpect(status().isOk());
     }
 
     @Test
