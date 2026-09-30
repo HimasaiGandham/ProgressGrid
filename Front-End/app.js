@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let habits = [];
-    let loadFailed = false;
     let currentWeekStart = getMonday(new Date());
 
     // DOM Elements
@@ -134,9 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('pg_demo_habits', JSON.stringify(list));
     }
 
+    // False on GitHub Pages and for offline demo sign-ins: those only use localStorage.
+    function usesServer() {
+        return !isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-');
+    }
+
     // One place for the session token, the request timeout and what a 401 means.
+    // Resolves to the response, or null when there's no server to ask or it can't be reached.
     async function api(path, options = {}) {
-        if (isGitHubPages || localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+        if (!usesServer()) {
             return null;
         }
         try {
@@ -148,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 signal: AbortSignal.timeout(3500)
             });
-            if (res.status === 401 && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+            if (res.status === 401) {
                 // Missing or expired session: sign in again.
                 localStorage.removeItem('progressgrid_token');
                 window.location.href = 'login.html';
@@ -411,17 +416,8 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             if (!habit.name) return;
 
-            let savedOnServer = false;
-            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                try {
-                    const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
-                    if (res && res.ok) {
-                        savedOnServer = true;
-                    }
-                } catch (err) {}
-            }
-
-            if (!savedOnServer) {
+            const res = await api('', { method: 'POST', body: JSON.stringify(habit) });
+            if (!res || !res.ok) {
                 const current = getStoredHabits();
                 current.push({
                     id: Date.now(),
@@ -456,9 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveStoredHabits(currentList);
                 renderDashboard();
 
-                if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                    await api(`/${habitId}`, { method: 'DELETE' }).catch(() => {});
-                }
+                await api(`/${habitId}`, { method: 'DELETE' });
                 return;
             }
 
@@ -486,9 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             renderDashboard();
-            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
-            }
+            await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) });
         });
 
         // Navigation
@@ -503,24 +495,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchHabits() {
-        let loadedFromServer = false;
-        if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-            try {
-                const res = await api('');
-                if (res && res.ok) {
-                    habits = await res.json();
-                    loadedFromServer = true;
-                    saveStoredHabits(habits);
-                    loadFailed = false;
-                }
-            } catch (e) {
-                // Live backend unavailable (e.g. on GitHub Pages static hosting)
-            }
-        }
-
-        if (!loadedFromServer) {
+        const res = await api('');
+        const serverHabits = res && res.ok ? await res.json().catch(() => null) : null;
+        if (Array.isArray(serverHabits)) {
+            habits = serverHabits;
+            saveStoredHabits(habits);
+        } else {
+            // No server (GitHub Pages / demo sign-in) or it couldn't be reached.
             habits = getStoredHabits();
-            loadFailed = false;
         }
 
         habits.forEach(h => {
@@ -555,10 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dayHeaderRow.innerHTML = '<th>Habit</th>' + days.map((iso, i) => `<th>${dayNames[i]}<br><small>${Number(iso.slice(8))}</small></th>`).join('');
 
         if (habits.length === 0) {
-            const message = loadFailed
-                ? "Couldn't load your habits. Check that the backend is running, then refresh."
-                : 'No habits yet. Add one above!';
-            habitTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;">${message}</td></tr>`;
+            habitTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">No habits yet. Add one above!</td></tr>';
             return;
         }
 
