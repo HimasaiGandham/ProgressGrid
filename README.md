@@ -362,6 +362,79 @@ The purpose is to encourage **awareness, balance, consistency, and continuous im
 
 ---
 
+# ▶️ Running ProgressGrid
+
+ProgressGrid has three parts: the static site in `Front-End/`, the Spring Boot API in `Back-End/` (Java 17) and a MySQL database (`Data-Base/`).
+
+## Locally
+
+**Quick start (Windows):** run `run-app.bat`. It starts the API on `http://localhost:8080` and `dev_server.py` on `http://localhost:3000`, which serves the site and forwards `/api` to the API. You need Java 17+, Maven and Python 3.
+
+**Without MySQL:** start the API with the in-memory H2 profile. Data is lost when it stops.
+
+```bash
+cd Back-End
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+python ../dev_server.py        # in another terminal, then open http://localhost:3000
+```
+
+**With MySQL:** create the database and user first (`mysql -u root -p < Data-Base/schema.sql`), then run `mvn spring-boot:run` without a profile.
+
+## Where the site sends its requests
+
+`Front-End/app.js` and `login.js` pick the API address from the page's own address:
+
+| Site opened from | API used |
+|---|---|
+| port `3000` or `8080` (`dev_server.py`, or the API itself) | same address, `/api` |
+| `localhost` / `127.0.0.1` on any other port (e.g. VS Code Live Server on `5500`) | `http://localhost:8080/api` |
+| `*.github.io` (GitHub Pages) | **none**: demo mode, see below |
+| any other host | same address, `/api` |
+
+## ⚠️ GitHub Pages runs in demo mode only
+
+`.github/workflows/deploy.yml` publishes `Front-End/` to GitHub Pages on every push to `main`. GitHub Pages only serves static files, so it **cannot run the Java API or host MySQL**. On a `*.github.io` address the site never calls an API and runs in an offline demo mode:
+
+- sign-up, sign-in and password reset are simulated in the browser (the demo reset code is `123456`);
+- habits and ticks are saved in that browser's `localStorage` only. They aren't synced between devices or browsers, and clearing site data deletes them;
+- streaks and percentages are rough client-side estimates, not the server's scoring.
+
+Use the Pages site as a UI preview. Don't use it for real accounts or data.
+
+## Full-stack deployment
+
+For real accounts and data, host the API and a MySQL database, and serve the site **from the same address as the API**. On any host other than `localhost` and `github.io`, the site calls `/api` on its own origin.
+
+1. **Database:** create a MySQL database on any provider (Railway, Aiven, your own server, …). The API creates the tables on first start.
+2. **Site + API in one app:** copy the site into Spring Boot's static folder so the API serves both:
+   ```bash
+   mkdir -p Back-End/src/main/resources/static
+   cp -r Front-End/* Back-End/src/main/resources/static/
+   cd Back-End && mvn -DskipTests package   # produces target/tracker-backend-1.0.0-SNAPSHOT.jar
+   ```
+   Open `/login.html` on the deployed address to sign in.
+3. **Host the jar** on any Java 17 host (Railway, Render, Fly.io, a VM, …): `java -jar target/tracker-backend-1.0.0-SNAPSHOT.jar`, listening on port 8080 (set `SERVER_PORT` if the platform assigns a port). Some platforms (e.g. Render, Fly.io) run Docker images; this repo doesn't include a Dockerfile yet.
+4. **Set the environment variables** below. `JWT_SECRET` and the datasource settings are required in production.
+
+Alternatively, keep the site on another static host and put a reverse proxy in front of both, so that `/api/*` on the site's address is forwarded to the API. That's what `dev_server.py` does locally. The site can't call an API on a *different* origin: except on `localhost`, it always uses its own.
+
+## Environment variables
+
+Read by `Back-End/src/main/resources/application.properties`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | *(none)* | `dev` = in-memory H2 instead of MySQL |
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3306/progressgrid_db?...` | Database JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `pg_user` / `password123` | Database login (**change in production**) |
+| `SPRING_DATASOURCE_DRIVER` | `com.mysql.cj.jdbc.Driver` | JDBC driver class |
+| `JWT_SECRET` | *(none)* | Signs login tokens. **Required in production**: 32+ random characters |
+| `JWT_EXPIRATION_MS` | `86400000` (24 h) | How long a login lasts |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | *(none)* / `ProgressGrid <onboarding@resend.dev>` | Send password reset emails through [Resend](https://resend.com) |
+| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | `smtp.gmail.com` / `587` / *(none)* / *(none)* | SMTP fallback for reset emails |
+
+---
+
 # 🚀 Project Status
 
 **Status:** 🚧 In Development
