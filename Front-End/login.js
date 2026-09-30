@@ -199,6 +199,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
+    // No backend to send a real code: continue the reset with the fixed demo code.
+    function startDemoReset(identifier) {
+        currentForgotIdentifier = identifier;
+        currentForgotOtp = '123456';
+        document.getElementById('displayMaskedEmail').innerText = identifier;
+        setForgotStep(2);
+        startResendCountdown(60);
+        forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
+        forgotMsg2.style.color = '#10b981';
+    }
+
+    // Password changed: say so, then go back to the sign-in form with the identifier filled in.
+    function showResetDone() {
+        stepDot3.classList.add('completed');
+        forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
+        forgotMsg3.style.color = '#10b981';
+        setTimeout(() => {
+            forgotFormContainer.classList.remove('active');
+            loginForm.classList.add('active');
+            document.getElementById('loginUsername').value = currentForgotIdentifier;
+            document.getElementById('loginPassword').value = '';
+            loginError.innerText = 'Password updated! Please sign in with your new password.';
+            loginError.style.color = '#10b981';
+        }, 1300);
+    }
+
     showForgot.addEventListener('click', (e) => {
         e.preventDefault();
         loginForm.classList.remove('active');
@@ -240,13 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnLoader.style.display = 'inline';
 
         if (isGitHubPages) {
-            currentForgotIdentifier = identifier;
-            currentForgotOtp = '123456';
-            document.getElementById('displayMaskedEmail').innerText = identifier;
-            setForgotStep(2);
-            startResendCountdown(60);
-            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
-            forgotMsg2.style.color = '#10b981';
+            startDemoReset(identifier);
             btn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';
@@ -269,24 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 setForgotStep(2);
                 startResendCountdown(60);
             } else if (res.status === 405 || res.status === 404) {
-                currentForgotIdentifier = identifier;
-                currentForgotOtp = '123456';
-                document.getElementById('displayMaskedEmail').innerText = identifier;
-                setForgotStep(2);
-                startResendCountdown(60);
-                forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
-                forgotMsg2.style.color = '#10b981';
+                startDemoReset(identifier);
             } else {
                 forgotMsg1.innerText = data.message || 'Could not find account with that identifier.';
             }
         } catch (err) {
-            currentForgotIdentifier = identifier;
-            currentForgotOtp = '123456';
-            document.getElementById('displayMaskedEmail').innerText = identifier;
-            setForgotStep(2);
-            startResendCountdown(60);
-            forgotMsg2.innerText = 'Demo Mode: Verification code is 123456.';
-            forgotMsg2.style.color = '#10b981';
+            startDemoReset(identifier);
         } finally {
             btn.disabled = false;
             btnText.style.display = 'inline';
@@ -427,18 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isGitHubPages) {
             saveDemoUser(currentForgotIdentifier, '', newPassword);
-            stepDot3.classList.add('completed');
-            forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
-            forgotMsg3.style.color = '#10b981';
-
-            setTimeout(() => {
-                forgotFormContainer.classList.remove('active');
-                loginForm.classList.add('active');
-                document.getElementById('loginUsername').value = currentForgotIdentifier;
-                document.getElementById('loginPassword').value = '';
-                loginError.innerText = 'Password updated! Please sign in with your new password.';
-                loginError.style.color = '#10b981';
-            }, 1200);
+            showResetDone();
             btn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';
@@ -460,48 +457,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json().catch(() => ({}));
 
             if (res.ok && data.status === 'success') {
-                stepDot3.classList.add('completed');
-                forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
-                forgotMsg3.style.color = '#10b981';
-
-                setTimeout(() => {
-                    forgotFormContainer.classList.remove('active');
-                    loginForm.classList.add('active');
-                    document.getElementById('loginUsername').value = currentForgotIdentifier;
-                    document.getElementById('loginPassword').value = '';
-                    loginError.innerText = 'Password updated! Please sign in with your new password.';
-                    loginError.style.color = '#10b981';
-                }, 1300);
+                showResetDone();
             } else if (res.status === 405 || res.status === 404) {
                 saveDemoUser(currentForgotIdentifier, '', newPassword);
-                stepDot3.classList.add('completed');
-                forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
-                forgotMsg3.style.color = '#10b981';
-                setTimeout(() => {
-                    forgotFormContainer.classList.remove('active');
-                    loginForm.classList.add('active');
-                    document.getElementById('loginUsername').value = currentForgotIdentifier;
-                    document.getElementById('loginPassword').value = '';
-                    loginError.innerText = 'Password updated! Please sign in with your new password.';
-                    loginError.style.color = '#10b981';
-                }, 1300);
+                showResetDone();
             } else {
                 forgotMsg3.innerText = data.message || 'Failed to update password. Please try again.';
             }
         } catch (err) {
             saveDemoUser(currentForgotIdentifier, '', newPassword);
-            stepDot3.classList.add('completed');
-            forgotMsg3.innerText = 'Password reset successfully! Redirecting to Sign In...';
-            forgotMsg3.style.color = '#10b981';
-
-            setTimeout(() => {
-                forgotFormContainer.classList.remove('active');
-                loginForm.classList.add('active');
-                document.getElementById('loginUsername').value = currentForgotIdentifier;
-                document.getElementById('loginPassword').value = '';
-                loginError.innerText = 'Password updated! Please sign in with your new password.';
-                loginError.style.color = '#10b981';
-            }, 1300);
+            showResetDone();
         } finally {
             btn.disabled = false;
             btnText.style.display = 'inline';

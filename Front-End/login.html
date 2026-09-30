@@ -178,39 +178,6 @@
     </div>
 </div>
 
-<!-- Inline safeguard to guarantee raw 405 or HTML tags can NEVER be displayed on screen -->
-<script>
-(function() {
-    function sanitizeError(el) {
-        if (!el) return;
-        var txt = el.innerText || el.textContent || '';
-        if (txt.includes('<html') || txt.includes('405') || txt.includes('Not Allowed') || txt.includes('<body') || txt.includes('<center') || txt.includes('<!DOCTYPE')) {
-            el.innerText = 'Incorrect password. Please try again.';
-            el.style.color = '#e74c3c';
-        }
-    }
-
-    function monitor(id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var observer = new MutationObserver(function() {
-            sanitizeError(el);
-        });
-        observer.observe(el, { childList: true, characterData: true, subtree: true });
-        sanitizeError(el);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initObservers);
-    } else {
-        initObservers();
-    }
-
-    function initObservers() {
-        ['loginError', 'signupError', 'forgotMsg1', 'forgotMsg2', 'forgotMsg3'].forEach(monitor);
-    }
-})();
-</script>
 <script src="login.js?v=20260925-v1"></script>
 </body>
 </html>
