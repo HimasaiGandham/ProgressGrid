@@ -13,7 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.DayOfWeek;
+import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
@@ -33,11 +35,28 @@ public class HabitService {
     @Autowired
     private HabitCategoryRepository categoryRepository;
 
-    public List<HabitDTO> getAllHabits(Long userId) {
-        return habitRepository.findByUserId(userId).stream().map(this::mapToDTO).collect(Collectors.toList());
+    /**
+     * "Today" for the caller: the date in their timezone (an IANA id such as "Asia/Kolkata", sent
+     * by the browser), or the server's date if none or an unknown one is given. Using the server's
+     * clock rejected ticks from anyone already past midnight while the server was still on the
+     * previous day.
+     */
+    public static LocalDate today(String timeZone) {
+        if (timeZone != null && !timeZone.isBlank()) {
+            try {
+                return LocalDate.now(ZoneId.of(timeZone.trim()));
+            } catch (DateTimeException e) {
+                // Unknown zone: fall through to the server's date.
+            }
+        }
+        return LocalDate.now();
     }
 
-    public HabitDTO createHabit(Long userId, HabitDTO dto) {
+    public List<HabitDTO> getAllHabits(Long userId, LocalDate today) {
+        return habitRepository.findByUserId(userId).stream().map(habit -> mapToDTO(habit, today)).collect(Collectors.toList());
+    }
+
+    public HabitDTO createHabit(Long userId, HabitDTO dto, LocalDate today) {
         if (dto.getName() == null || dto.getName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Habit name is required");
         }
@@ -48,7 +67,7 @@ public class HabitService {
         habit.setDescription(dto.getDescription());
         habit.setFrequency(dto.getFrequency() != null ? dto.getFrequency() : "Daily");
         habit.setTargetDays(dto.getTargetDays() != null ? dto.getTargetDays() : 7);
-        habit.setStartDate(dto.getStartDate() != null ? dto.getStartDate() : LocalDate.now());
+        habit.setStartDate(dto.getStartDate() != null ? dto.getStartDate() : today);
 
         if (dto.getCategory() != null) {
             habit.setCategory(categoryRepository.findFirstByNameIgnoreCase(dto.getCategory()).orElseGet(() -> {
@@ -59,16 +78,15 @@ public class HabitService {
             }));
         }
 
-        return mapToDTO(habitRepository.save(habit));
+        return mapToDTO(habitRepository.save(habit), today);
     }
 
-    public void toggleCompletion(Long userId, Long habitId, LocalDate date, boolean completed) {
+    public void toggleCompletion(Long userId, Long habitId, LocalDate date, boolean completed, LocalDate today) {
         Habit habit = findOwned(userId, habitId);
 
-        // A tick has to fall between the habit's start date and today; ticks outside that range
-        // used to be accepted and inflated the completion percentage.
-        // ponytail: the server's clock decides "today". Send the client's date if users span timezones.
-        if (date == null || date.isBefore(habit.getStartDate()) || date.isAfter(LocalDate.now())) {
+        // A tick has to fall between the habit's start date and the caller's today; ticks outside
+        // that range used to be accepted and inflated the completion percentage.
+        if (date == null || date.isBefore(habit.getStartDate()) || date.isAfter(today)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date must be between the habit's start date and today");
         }
 
@@ -98,7 +116,7 @@ public class HabitService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habit not found"));
     }
 
-    private HabitDTO mapToDTO(Habit habit) {
+    private HabitDTO mapToDTO(Habit habit, LocalDate today) {
         HabitDTO dto = new HabitDTO();
         dto.setId(habit.getId());
         dto.setName(habit.getName());
@@ -115,7 +133,7 @@ public class HabitService {
                 .collect(Collectors.toList());
         dto.setCompletions(completedDates);
 
-        calculateStreaksAndStats(dto, completedDates, habit.getStartDate(), "weekly".equalsIgnoreCase(habit.getFrequency()));
+        calculateStreaksAndStats(dto, completedDates, habit.getStartDate(), today, "weekly".equalsIgnoreCase(habit.getFrequency()));
         return dto;
     }
 
@@ -123,9 +141,9 @@ public class HabitService {
      * Streaks and completion % in the habit's own unit: days for a daily habit, weeks for a weekly
      * one, where any tick in a Monday-to-Sunday week completes that week.
      */
-    private void calculateStreaksAndStats(HabitDTO dto, List<LocalDate> dates, LocalDate startDate, boolean weekly) {
+    private void calculateStreaksAndStats(HabitDTO dto, List<LocalDate> dates, LocalDate startDate, LocalDate today, boolean weekly) {
         int step = weekly ? 7 : 1;
-        LocalDate now = periodOf(LocalDate.now(), weekly);
+        LocalDate now = periodOf(today, weekly);
         LocalDate first = periodOf(startDate, weekly);
         TreeSet<LocalDate> done = dates.stream()
                 .map(date -> periodOf(date, weekly))
