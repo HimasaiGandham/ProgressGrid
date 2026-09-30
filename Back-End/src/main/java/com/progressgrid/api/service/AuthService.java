@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.List;
 
 @Service
 public class AuthService {
@@ -83,7 +82,7 @@ public class AuthService {
 
         User targetUser = findAccount(query);
         if (targetUser == null) {
-            throw new RuntimeException("No account found with this username, email or ID");
+            throw new RuntimeException("No account found with this username or email");
         }
 
         // The code is stored under the account's email only. It used to be generated a second time
@@ -158,17 +157,16 @@ public class AuthService {
         return false;
     }
 
-    /** Resolves a username, email or numeric account id to its user, or null if none matches. */
+    /**
+     * The account for a password reset: an exact email or username (ignoring case), or null.
+     * Numeric account ids used to be accepted too, which let anyone walk the ids and collect every
+     * account's masked email; display names and email prefixes aren't unique, so they could pick
+     * the wrong account.
+     */
     private User findAccount(String query) {
-        List<User> users = userRepository.findMatchingUsers(query);
-        if (!users.isEmpty()) {
-            return users.get(0);
-        }
-        try {
-            return userRepository.findById(Long.parseLong(query)).orElse(null);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return userRepository.findFirstByEmailIgnoreCase(query)
+                .or(() -> userRepository.findFirstByUsernameIgnoreCase(query))
+                .orElse(null);
     }
 
     private AuthResponseDTO toResponse(User user) {
