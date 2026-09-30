@@ -69,7 +69,7 @@ class LiveDevelopmentHandler(http.server.SimpleHTTPRequestHandler):
         body = self.rfile.read(content_length) if content_length > 0 else None
 
         req_headers = {}
-        for key in ("Content-Type", "Authorization", "X-User-Id", "Accept"):
+        for key in ("Content-Type", "Authorization", "X-Timezone", "X-User-Id", "Accept"):
             val = self.headers.get(key)
             if val:
                 req_headers[key] = val

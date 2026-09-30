@@ -28,7 +28,7 @@ Daily habits are counted in days. Weekly habits are counted in Monday-to-Sunday 
 
 The current streak is the run of days (or weeks) done up to today. If today isn't ticked yet, a run that ended yesterday still counts, so the streak doesn't reset in the morning. The best streak is the longest run so far. Completion is the number of days (or weeks) done divided by the number since the start date, capped at 100%.
 
-A tick has to fall between the habit's start date and today; anything else gets a 400.
+A tick has to fall between the habit's start date and today; anything else gets a 400. "Today" is the user's date: the browser sends its timezone (e.g. `Asia/Kolkata`) in the `X-Timezone` header, and the server's own date is used only if that header is missing or unknown.
 
 ## Running
 
