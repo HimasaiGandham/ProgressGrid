@@ -177,38 +177,59 @@ body {
 }
 
 .top-user-profile {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 16px 6px 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 30px;
+    gap: 12px;
+    padding: 6px 14px 6px 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    user-select: none;
 }
 
 .top-user-profile:hover {
-    background: #f0fdf4;
+    background: #f8fafc;
     border-color: #86efac;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(76, 175, 80, 0.16);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px -2px rgba(34, 197, 94, 0.18), 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.top-user-profile:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.avatar-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .top-user-profile .avatar {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: var(--primary-color);
-    color: white;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%);
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 15px;
+    letter-spacing: 0.5px;
     overflow: hidden;
     flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    transition: transform 0.2s ease;
+}
+
+.top-user-profile:hover .avatar {
+    transform: scale(1.05);
 }
 
 .top-user-profile .avatar img {
@@ -217,23 +238,111 @@ body {
     object-fit: cover;
 }
 
+.avatar-status-badge {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
+    background: #22c55e;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25);
+    animation: statusPulse 2.5s infinite;
+}
+
+@keyframes statusPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 5px rgba(34, 197, 94, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    }
+}
+
 .top-user-profile .user-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     text-align: left;
 }
 
-.top-user-profile .user-info h4 {
+.top-user-profile .user-info h4,
+.top-user-profile .user-info .user-name {
     font-size: 13.5px;
     font-weight: 600;
-    color: var(--text-main);
-    line-height: 1.2;
+    color: #1e293b;
+    line-height: 1.25;
+    margin: 0;
+    max-width: 170px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+    transition: color 0.2s ease;
+}
+
+.top-user-profile:hover .user-name {
+    color: #15803d;
+}
+
+.user-meta-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    line-height: 1;
 }
 
 .top-user-profile .user-info .user-role {
     font-size: 11px;
-    color: var(--primary-color);
-    font-weight: 600;
-    display: block;
-    margin-top: 1px;
+    color: #64748b;
+    font-weight: 500;
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+.top-user-profile:hover .user-info .user-role {
+    color: #16a34a;
+}
+
+.role-separator {
+    font-size: 10px;
+    color: #cbd5e1;
+    user-select: none;
+}
+
+.user-plan-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    background: #e0f2fe;
+    color: #0284c7;
+    padding: 1px 6px;
+    border-radius: 4px;
+    line-height: 1.3;
+}
+
+.profile-chevron-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    margin-left: 2px;
+    transition: all 0.2s ease;
+}
+
+.profile-chevron {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.2s ease;
+}
+
+.top-user-profile:hover .profile-chevron {
+    transform: translateY(1.5px);
+    stroke: #16a34a;
 }
 
 .header-actions {
@@ -1453,106 +1562,104 @@ body {
     }
 }
 
- / *   C A L E N D A R   V I E W   * / 
- . c a l e n d a r - c o n t a i n e r   { 
-         d i s p l a y :   g r i d ; 
-         g r i d - t e m p l a t e - c o l u m n s :   2 f r   1 f r ; 
-         g a p :   3 0 p x ; 
-         m a r g i n - t o p :   2 0 p x ; 
- } 
- 
- . c a l e n d a r - h e a d e r   { 
-         d i s p l a y :   f l e x ; 
-         j u s t i f y - c o n t e n t :   s p a c e - b e t w e e n ; 
-         a l i g n - i t e m s :   c e n t e r ; 
-         m a r g i n - b o t t o m :   2 0 p x ; 
- } 
- 
- . c a l e n d a r - g r i d   { 
-         d i s p l a y :   g r i d ; 
-         g r i d - t e m p l a t e - c o l u m n s :   r e p e a t ( 7 ,   1 f r ) ; 
-         g a p :   8 p x ; 
-         t e x t - a l i g n :   c e n t e r ; 
- } 
- 
- . c a l - d a y - n a m e   { 
-         f o n t - w e i g h t :   6 0 0 ; 
-         c o l o r :   v a r ( - - t e x t - m u t e d ) ; 
-         m a r g i n - b o t t o m :   1 0 p x ; 
- } 
- 
- . c a l - d a y   { 
-         p a d d i n g :   1 5 p x   5 p x ; 
-         b o r d e r - r a d i u s :   8 p x ; 
-         b o r d e r :   1 p x   s o l i d   v a r ( - - b o r d e r - c o l o r ) ; 
-         c u r s o r :   p o i n t e r ; 
-         t r a n s i t i o n :   a l l   0 . 2 s ; 
-         b a c k g r o u n d :   v a r ( - - c a r d - b g ) ; 
- } 
- 
- . c a l - d a y : h o v e r   { 
-         b a c k g r o u n d :   r g b a ( 9 9 ,   1 0 2 ,   2 4 1 ,   0 . 0 5 ) ; 
-         b o r d e r - c o l o r :   v a r ( - - p r i m a r y - c o l o r ) ; 
- } 
- 
- . c a l - d a y . a c t i v e   { 
-         b a c k g r o u n d :   v a r ( - - p r i m a r y - c o l o r ) ; 
-         c o l o r :   w h i t e ; 
-         b o r d e r - c o l o r :   v a r ( - - p r i m a r y - c o l o r ) ; 
- } 
- 
- . c a l - d a y . o t h e r - m o n t h   { 
-         c o l o r :   v a r ( - - t e x t - m u t e d ) ; 
-         o p a c i t y :   0 . 5 ; 
- } 
- 
- . c a l - d a y . t o d a y   { 
-         f o n t - w e i g h t :   b o l d ; 
-         b o r d e r :   2 p x   s o l i d   v a r ( - - p r i m a r y - c o l o r ) ; 
- } 
- 
- . d a y - h a b i t s - l i s t   { 
-         m a r g i n - t o p :   2 0 p x ; 
- } 
- 
- . c a l - h a b i t - i t e m   { 
-         d i s p l a y :   f l e x ; 
-         a l i g n - i t e m s :   c e n t e r ; 
-         j u s t i f y - c o n t e n t :   s p a c e - b e t w e e n ; 
-         p a d d i n g :   1 2 p x ; 
-         b o r d e r - b o t t o m :   1 p x   s o l i d   v a r ( - - b o r d e r - c o l o r ) ; 
- } 
- 
- . c a l - h a b i t - i t e m : l a s t - c h i l d   { 
-         b o r d e r - b o t t o m :   n o n e ; 
- } 
- 
- . c a l - h a b i t - n a m e   { 
-         f o n t - w e i g h t :   5 0 0 ; 
-         c o l o r :   v a r ( - - t e x t - m a i n ) ; 
- } 
- 
- . c a l - h a b i t - s t a t u s   { 
-         d i s p l a y :   f l e x ; 
-         a l i g n - i t e m s :   c e n t e r ; 
- } 
- 
- . c a l - h a b i t - s t a t u s   . i c o n   { 
-         f o n t - s i z e :   2 0 p x ; 
- } 
- 
- . c a l - h a b i t - s t a t u s . c o m p l e t e d   { 
-         c o l o r :   v a r ( - - s u c c e s s - c o l o r ) ; 
- } 
- 
- . c a l - h a b i t - s t a t u s . m i s s e d   { 
-         c o l o r :   v a r ( - - t e x t - m u t e d ) ; 
- } 
- 
- @ m e d i a   ( m a x - w i d t h :   1 0 2 4 p x )   { 
-         . c a l e n d a r - c o n t a i n e r   { 
-                 g r i d - t e m p l a t e - c o l u m n s :   1 f r ; 
-         } 
- } 
-  
- 
+/* CALENDAR VIEW */
+.calendar-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    text-align: center;
+}
+
+.cal-day-name {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.cal-day {
+    padding: 15px 5px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card-bg);
+}
+
+.cal-day:hover {
+    background: rgba(99, 102, 241, 0.05);
+    border-color: var(--primary-color);
+}
+
+.cal-day.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.cal-day.other-month {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.cal-day.today {
+    font-weight: bold;
+    border: 2px solid var(--primary-color);
+}
+
+.day-habits-list {
+    margin-top: 20px;
+}
+
+.cal-habit-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cal-habit-item:last-child {
+    border-bottom: none;
+}
+
+.cal-habit-name {
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.cal-habit-status {
+    display: flex;
+    align-items: center;
+}
+
+.cal-habit-status .icon {
+    font-size: 20px;
+}
+
+.cal-habit-status.completed {
+    color: var(--check-green);
+}
+
+.cal-habit-status.missed {
+    color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+    .calendar-container {
+        grid-template-columns: 1fr;
+    }
+}
