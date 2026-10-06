@@ -1,4 +1,4 @@
-﻿---
+---
 name: "Feature Request"
 about: Suggest an idea or enhancement for ProgressGrid
 title: "[FEATURE]: "

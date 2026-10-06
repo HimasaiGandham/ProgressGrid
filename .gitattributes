@@ -1,3 +1,11 @@
-# GitHub Linguist language overrides
-# Vendor frontend auth utility to keep Java as the primary language in GitHub statistics
-Front-End/login.js linguist-vendored
+# GitHub Linguist Language Configuration
+# Un-vendor frontend and make SQL, HTML, CSS, and JS explicitly detectable in GitHub language statistics
+
+# Database (SQL)
+*.sql linguist-detectable=true
+*.sql linguist-language=SQL
+
+# Frontend (HTML, CSS, JavaScript)
+*.html linguist-detectable=true
+*.css linguist-detectable=true
+*.js linguist-detectable=true
