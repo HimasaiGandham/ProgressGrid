@@ -9,7 +9,8 @@
     <title>ProgressGrid - Habit Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260924-v2">
+    <link rel="stylesheet" href="base.css?v=20261007-v2">
+    <link rel="stylesheet" href="style.css?v=20261007-v2">
     <!-- Chart.js for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -44,15 +45,25 @@
                     <p id="currentDateDisplay">September 2026</p>
                 </div>
                 <div class="header-right-area">
-                    <!-- Profile in Top Right Corner on Top of Add Habit -->
+                    <!-- Modern Sleek User Profile Badge -->
                     <div class="top-user-profile" id="userProfileBtn" role="button" tabindex="0" title="Click to view & edit Profile Settings">
-                        <div class="avatar" id="sidebarAvatar">
-                            <span id="sidebarAvatarText">U</span>
-                            <img id="sidebarAvatarImg" src="" alt="User Avatar" style="display: none;">
+                        <div class="avatar-wrapper">
+                            <div class="avatar" id="sidebarAvatar">
+                                <span id="sidebarAvatarText">H</span>
+                                <img id="sidebarAvatarImg" src="" alt="User Avatar" style="display: none;">
+                            </div>
+                            <span class="avatar-status-badge" title="Active"></span>
                         </div>
                         <div class="user-info">
-                            <h4 id="sidebarUsername">User</h4>
-                            <span class="user-role">View Profile</span>
+                            <h4 id="sidebarUsername" class="user-name">User</h4>
+                            <div class="user-meta-sub">
+                                <span class="user-role" id="sidebarUserRole">View Profile</span>
+                            </div>
+                        </div>
+                        <div class="profile-chevron-wrap">
+                            <svg class="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
                         </div>
                     </div>
 
@@ -110,9 +121,109 @@
                     </div>
                 </section>
 
-                <!-- RIGHT PANELS -->
-                <aside class="right-panels">
-                    <section class="card weekly-chart-card">
+
+            </div>
+        </div>
+
+        <!-- TAB VIEW 2: STATISTICS & ANALYTICS VIEW -->
+        <div id="statsView" class="tab-view" style="display: none;">
+            <!-- HEADER -->
+            <header class="top-header stats-header">
+                <div class="header-titles">
+                    <h1>Habit Analytics & Statistics</h1>
+                    <p>Track consistency, spot trends, and accelerate your personal growth</p>
+                </div>
+                <div class="header-right-area">
+                    <div class="stats-header-controls">
+                        <div class="timeframe-pills" id="statsTimeframeSelector">
+                            <button class="pill-btn" data-timeframe="week">This Week</button>
+                            <button class="pill-btn active" data-timeframe="30days">Last 30 Days</button>
+                            <button class="pill-btn" data-timeframe="month">This Month</button>
+                            <button class="pill-btn" data-timeframe="all">All Time</button>
+                        </div>
+                        <button class="btn-secondary" id="statsBackToDashboardBtn">← Back to Dashboard</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- STATS KPI SUMMARY ROW -->
+            <section class="stats-kpi-grid">
+                <div class="card stats-kpi-card" id="kpiConsistencyCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                        <span class="icon">trending_up</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Consistency Rate</span>
+                        <h2 class="kpi-value" id="statsOverallRate">0%</h2>
+                        <span class="kpi-subtext" id="statsOverallSubtext">Based on scheduled habits</span>
+                    </div>
+                </div>
+
+                <div class="card stats-kpi-card" id="kpiCurrentStreakCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(249, 115, 22, 0.12); color: #f97316;">
+                        <span class="icon">local_fire_department</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Active Streak Leader</span>
+                        <h2 class="kpi-value" id="statsCurrentStreak">0 days</h2>
+                        <span class="kpi-subtext" id="statsCurrentStreakHabit">None active</span>
+                    </div>
+                </div>
+
+                <div class="card stats-kpi-card" id="kpiBestStreakCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(234, 179, 8, 0.12); color: #eab308;">
+                        <span class="icon">emoji_events</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">All-Time Best Streak</span>
+                        <h2 class="kpi-value" id="statsBestStreak">0 days</h2>
+                        <span class="kpi-subtext" id="statsBestStreakHabit">Personal record</span>
+                    </div>
+                </div>
+
+                <div class="card stats-kpi-card" id="kpiTotalTicksCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(99, 102, 241, 0.12); color: #6366f1;">
+                        <span class="icon">task_alt</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Total Check-Ins</span>
+                        <h2 class="kpi-value" id="statsTotalCompletions">0</h2>
+                        <span class="kpi-subtext" id="statsCompletionsSubtext">Completed habit ticks</span>
+                    </div>
+                </div>
+
+                <div class="card stats-kpi-card" id="kpiPerfectDaysCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(168, 85, 247, 0.12); color: #a855f7;">
+                        <span class="icon">stars</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Perfect Days</span>
+                        <h2 class="kpi-value" id="statsPerfectDays">0</h2>
+                        <span class="kpi-subtext">100% completion days</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SMART INSIGHTS CALLOUT -->
+            <section class="stats-insights-section">
+                <div class="card stats-insights-card">
+                    <div class="insights-header">
+                        <div class="insights-title">
+                            <span class="icon" style="color: #f59e0b;">lightbulb</span>
+                            <h3>Performance Insights & Discipline Highlights</h3>
+                        </div>
+                    </div>
+                    <div class="insights-grid" id="statsInsightsGrid">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- CHARTS SECTION -->
+            <div class="stats-charts-grid">
+                <!-- FORMER DASHBOARD RIGHT PANELS -->
+                <aside class="right-panels" style="display: contents;">
+                    <section class="card weekly-chart-card chart-span-2">
                         <div class="chart-header-row">
                             <h2>Weekly Progress Graph</h2>
                             <span id="weeklyAvgBadge" class="chart-avg-badge">0% Avg</span>
@@ -127,6 +238,11 @@
                             <span class="legend-pill" style="--pill-color: #f97316;"><span class="pill-dot"></span>25%</span>
                             <span class="legend-pill" style="--pill-color: #ef4444;"><span class="pill-dot"></span>&lt;25%</span>
                             <span class="legend-pill" style="--pill-color: #94a3b8;"><span class="pill-dot"></span>0%</span>
+                        </div>
+                        <div class="chart-footer-row" style="display: none;">
+                            <button type="button" id="goToStatsBtn" class="btn-link-stats">
+                                <span class="icon" style="font-size: 16px; margin-right: 6px;">bar_chart</span> View Detailed Statistics &amp; Trends →
+                            </button>
                         </div>
                     </section>
 
@@ -144,10 +260,146 @@
                         </div>
                     </section>
                 </aside>
+
+
+                <!-- MAIN CHART: TRENDLINE -->
+                <div class="card stats-chart-card chart-span-2">
+                    <div class="chart-header-row">
+                        <div>
+                            <h2>Consistency Trajectory</h2>
+                            <p class="chart-subtitle">Daily completion percentage over time</p>
+                        </div>
+                        <span class="chart-avg-badge" id="statsTrendAvgBadge">0% Avg</span>
+                    </div>
+                    <div class="chart-wrapper stats-chart-wrapper">
+                        <canvas id="statsTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- CATEGORY DISTRIBUTION DONUT -->
+                <div class="card stats-chart-card">
+                    <div class="chart-header-row">
+                        <div>
+                            <h2>Category Breakdown</h2>
+                            <p class="chart-subtitle">Habits across life areas</p>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper donut-chart-wrapper">
+                        <canvas id="statsCategoryChart"></canvas>
+                    </div>
+                    <div class="category-legend-list" id="statsCategoryLegend">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <!-- DAY OF WEEK DISCIPLINE BAR CHART -->
+                <div class="card stats-chart-card">
+                    <div class="chart-header-row">
+                        <div>
+                            <h2>Day-of-Week Consistency</h2>
+                            <p class="chart-subtitle">Identify your strongest and weakest days</p>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper stats-chart-wrapper">
+                        <canvas id="statsDayOfWeekChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 30-DAY ACTIVITY HEATMAP MATRIX -->
+                <div class="card stats-chart-card chart-span-2">
+                    <div class="chart-header-row">
+                        <div>
+                            <h2>Activity Heatmap Matrix</h2>
+                            <p class="chart-subtitle">Daily check-in intensity over the past 30 days</p>
+                        </div>
+                        <div class="heatmap-legend">
+                            <span class="legend-text">Less</span>
+                            <span class="heatmap-swatch lvl-0"></span>
+                            <span class="heatmap-swatch lvl-1"></span>
+                            <span class="heatmap-swatch lvl-2"></span>
+                            <span class="heatmap-swatch lvl-3"></span>
+                            <span class="heatmap-swatch lvl-4"></span>
+                            <span class="legend-text">More</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-grid-container" id="statsHeatmapGrid">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- HABIT PERFORMANCE LEADERBOARD TABLE -->
+            <section class="card stats-table-card">
+                <div class="chart-header-row">
+                    <div>
+                        <h2>Habit Consistency Matrix</h2>
+                        <p class="chart-subtitle">Detailed breakdown and discipline status for every habit</p>
+                    </div>
+                    <div class="table-search-wrap">
+                        <input type="text" id="statsHabitSearch" placeholder="Filter habits..." class="stats-search-input">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="stats-leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Habit</th>
+                                <th>Category</th>
+                                <th>Frequency</th>
+                                <th>Current Streak</th>
+                                <th>Best Streak</th>
+                                <th>Check-Ins</th>
+                                <th>Completion Rate</th>
+                                <th>Discipline Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsLeaderboardBody">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- TAB VIEW 4: CALENDAR VIEW -->
+        <div id="calendarView" class="tab-view" style="display: none;">
+            <!-- HEADER -->
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1>Habit Calendar</h1>
+                    <p>Select a date to view your habits and progress</p>
+                </div>
+            </header>
+            
+            <div class="calendar-container">
+                <div class="card calendar-card">
+                    <div class="calendar-header">
+                        <button id="calPrevMonth" class="btn-icon"><span class="icon">chevron_left</span></button>
+                        <h2 id="calMonthYear">September 2026</h2>
+                        <button id="calNextMonth" class="btn-icon"><span class="icon">chevron_right</span></button>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="cal-day-name">Sun</div>
+                        <div class="cal-day-name">Mon</div>
+                        <div class="cal-day-name">Tue</div>
+                        <div class="cal-day-name">Wed</div>
+                        <div class="cal-day-name">Thu</div>
+                        <div class="cal-day-name">Fri</div>
+                        <div class="cal-day-name">Sat</div>
+                        <!-- Calendar days injected by JS -->
+                    </div>
+                </div>
+
+                <div class="card calendar-details-card">
+                    <h3 id="calSelectedDateText">Selected Date Habits</h3>
+                    <div id="calDayHabitsList" class="day-habits-list">
+                        <p class="text-muted">Select a day on the calendar to see habits.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- TAB VIEW 2: PROFILE SETTINGS VIEW -->
+        <!-- TAB VIEW 3: PROFILE SETTINGS VIEW -->
         <div id="profileView" class="tab-view" style="display: none;">
             <!-- HEADER -->
             <header class="top-header">
@@ -292,6 +544,7 @@
     </div>
 </div>
 
-<script src="app.js?v=20260924-v2"></script>
+<script src="config.js?v=20261007-v2"></script>
+<script src="app.js?v=20261007-v2"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-﻿---
+---
 name: "Database / Connection Issue"
 about: Report problems connecting Frontend, Backend, or MySQL Database
 title: "[DB/CONN]: "

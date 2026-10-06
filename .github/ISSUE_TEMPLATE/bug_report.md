@@ -1,4 +1,4 @@
-﻿---
+---
 name: "Bug Report"
 about: Report an issue or unexpected behavior in ProgressGrid
 title: "[BUG]: "
