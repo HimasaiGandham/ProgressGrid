@@ -1,7 +1,3 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io');
-const BACKEND_BASE = (window.location.port === '3000' || window.location.port === '8080')
-    ? window.location.origin
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : window.location.origin);
 const API_URL = `${BACKEND_BASE}/api/habits`;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let habits = [];
-    let loadFailed = false;
     let currentWeekStart = getMonday(new Date());
 
     // DOM Elements
@@ -145,9 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('pg_demo_habits', JSON.stringify(list));
     }
 
+    // False on GitHub Pages and for offline demo sign-ins: those only use localStorage.
+    function usesServer() {
+        return !isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-');
+    }
+
     // One place for the session token, the request timeout and what a 401 means.
+    // Resolves to the response, or null when there's no server to ask or it can't be reached.
     async function api(path, options = {}) {
-        if (isGitHubPages || localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+        if (!usesServer()) {
             return null;
         }
         try {
@@ -159,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 signal: AbortSignal.timeout(3500)
             });
-            if (res.status === 401 && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
+            if (res.status === 401) {
                 // Missing or expired session: sign in again.
                 localStorage.removeItem('progressgrid_token');
                 window.location.href = 'login.html';
@@ -179,32 +180,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Derive from username if it's not an email
         if (username && typeof username === 'string' && !username.includes('@') && username.trim().toLowerCase() !== 'user') {
             const clean = username.trim();
-            if (clean.toLowerCase().includes('himasai') || clean.toLowerCase().includes('gandham')) {
-                return 'Himasai Gandham';
-            }
             return clean.replace(/[._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         }
 
-        // 3. If username or email is an email address (e.g. himasaigandham277@gmail.com)
+        // 3. If username or email is an email address (e.g. jane.doe42@example.com)
         const emailToInspect = (username && username.includes('@')) ? username : (email || '');
         if (emailToInspect) {
             const localPart = emailToInspect.split('@')[0];
-            if (localPart.toLowerCase().includes('himasai') || localPart.toLowerCase().includes('gandham')) {
-                return 'Himasai Gandham';
-            }
             const cleaned = localPart.replace(/\d+$/, '').replace(/[._\-]/g, ' ').trim();
             if (cleaned) {
                 return cleaned.replace(/\b\w/g, c => c.toUpperCase());
             }
         }
 
-        return 'Himasai Gandham';
+        return 'User';
     }
 
     function initProfileData() {
         const storedRawUsername = localStorage.getItem('username') || '';
         const storedRawFullName = localStorage.getItem('userFullName') || '';
-        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : 'himasaigandham277@gmail.com');
+        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : '');
         const storedMobile = localStorage.getItem('userMobile') || '';
         const storedAvatar = localStorage.getItem('userAvatar');
 
@@ -236,8 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAvatar(photoDataUrl, fallbackName) {
-        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'Himasai Gandham';
-        const initial = (nameToUse.trim().charAt(0) || 'H').toUpperCase();
+        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'User';
+        const initial = (nameToUse.trim().charAt(0) || 'U').toUpperCase();
 
         if (photoDataUrl) {
             // Large Avatar in Profile View
@@ -516,17 +511,8 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             if (!habit.name) return;
 
-            let savedOnServer = false;
-            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                try {
-                    const res = await api('', { method: 'POST', body: JSON.stringify(habit) }).catch(() => null);
-                    if (res && res.ok) {
-                        savedOnServer = true;
-                    }
-                } catch (err) {}
-            }
-
-            if (!savedOnServer) {
+            const res = await api('', { method: 'POST', body: JSON.stringify(habit) });
+            if (!res || !res.ok) {
                 const current = getStoredHabits();
                 current.push({
                     id: Date.now(),
@@ -561,9 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveStoredHabits(currentList);
                 renderDashboard();
 
-                if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                    await api(`/${habitId}`, { method: 'DELETE' }).catch(() => {});
-                }
+                await api(`/${habitId}`, { method: 'DELETE' });
                 return;
             }
 
@@ -592,9 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             renderDashboard();
-            if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-                await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) }).catch(() => {});
-            }
+            await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) });
         });
 
         // Navigation
@@ -609,24 +591,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchHabits() {
-        let loadedFromServer = false;
-        if (!isGitHubPages && !localStorage.getItem('progressgrid_token')?.startsWith('demo-')) {
-            try {
-                const res = await api('');
-                if (res && res.ok) {
-                    habits = await res.json();
-                    loadedFromServer = true;
-                    saveStoredHabits(habits);
-                    loadFailed = false;
-                }
-            } catch (e) {
-                // Live backend unavailable (e.g. on GitHub Pages static hosting)
-            }
-        }
-
-        if (!loadedFromServer) {
+        const res = await api('');
+        const serverHabits = res && res.ok ? await res.json().catch(() => null) : null;
+        if (Array.isArray(serverHabits)) {
+            habits = serverHabits;
+            saveStoredHabits(habits);
+        } else {
+            // No server (GitHub Pages / demo sign-in) or it couldn't be reached.
             habits = getStoredHabits();
-            loadFailed = false;
         }
 
         habits.forEach(h => {
@@ -665,10 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dayHeaderRow.innerHTML = '<th>Habit</th>' + days.map((iso, i) => `<th>${dayNames[i]}<br><small>${Number(iso.slice(8))}</small></th>`).join('');
 
         if (habits.length === 0) {
-            const message = loadFailed
-                ? "Couldn't load your habits. Check that the backend is running, then refresh."
-                : 'No habits yet. Add one above!';
-            habitTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;">${message}</td></tr>`;
+            habitTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">No habits yet. Add one above!</td></tr>';
             return;
         }
 
