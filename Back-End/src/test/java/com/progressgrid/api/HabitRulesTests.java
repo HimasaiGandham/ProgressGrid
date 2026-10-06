@@ -129,4 +129,22 @@ class HabitRulesTests {
         assertThat(h.get("completionPercentage").asInt()).isEqualTo(100); // 2 of 2 weeks
         assertThat(h.get("currentStreak").asInt()).isEqualTo(2);
     }
+
+    @Test
+    void habitStatsEndpointReturnsAggregatedData() throws Exception {
+        String token = signUp();
+        long id = habitStarting(token, TODAY.minusDays(5), "Daily");
+        tick(token, id, TODAY);
+        tick(token, id, TODAY.minusDays(1));
+
+        String body = mvc.perform(get("/api/habits/stats").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode stats = json.readTree(body);
+        assertThat(stats.get("totalHabits").asInt()).isEqualTo(1);
+        assertThat(stats.get("totalCompletions").asInt()).isEqualTo(2);
+        assertThat(stats.get("currentStreak").asInt()).isGreaterThanOrEqualTo(2);
+        assertThat(stats.get("overallCompletionPercentage").asInt()).isGreaterThan(0);
+        assertThat(stats.has("dayOfWeekCompletionRates")).isTrue();
+    }
 }

@@ -1,6 +1,7 @@
 package com.progressgrid.api.controller;
 
 import com.progressgrid.api.dto.HabitDTO;
+import com.progressgrid.api.dto.HabitStatsDTO;
 import com.progressgrid.api.dto.ToggleCompletionDTO;
 import com.progressgrid.api.security.AuthConfig;
 import com.progressgrid.api.service.HabitService;
@@ -21,6 +22,11 @@ public class HabitController {
     @GetMapping
     public ResponseEntity<List<HabitDTO>> getAllHabits(@RequestAttribute(AuthConfig.USER_ID) Long userId) {
         return ResponseEntity.ok(habitService.getAllHabits(userId));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<HabitStatsDTO> getHabitStats(@RequestAttribute(AuthConfig.USER_ID) Long userId) {
+        return ResponseEntity.ok(habitService.getHabitStats(userId));
     }
 
     @PostMapping

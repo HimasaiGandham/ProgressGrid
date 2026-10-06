@@ -506,8 +506,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const data = await res.json();
                 localStorage.setItem('progressgrid_token', data.token);
-                localStorage.setItem('username', data.username || username);
-                if (data.email) localStorage.setItem('email', data.email);
+                const rawUser = data.username || username;
+                const cleanUser = rawUser.includes('@') ? rawUser.split('@')[0] : rawUser;
+                localStorage.setItem('username', cleanUser);
+                const userEmail = data.email || (username.includes('@') ? username : '');
+                if (userEmail) {
+                    localStorage.setItem('email', userEmail);
+                    localStorage.setItem('userEmail', userEmail);
+                }
                 window.location.href = 'index.html';
             } else if (res.status === 405 || res.status === 404) {
                 // Static host returned 405 Method Not Allowed / 404
