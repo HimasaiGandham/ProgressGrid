@@ -5,6 +5,7 @@
 ProgressGrid is a **personal daily habit and progress-tracking web application designed mainly for students**. It helps users organize their day-to-day activities, maintain consistency, and visually understand how well they are progressing throughout the day, week, and month.
 
 ---
+🚀 Live Demo: https://himasaigandham.github.io/ProgressGrid/login.html
 
 ## 🎯 Why ProgressGrid?
 

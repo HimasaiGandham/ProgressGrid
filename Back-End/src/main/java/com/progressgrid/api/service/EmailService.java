@@ -41,10 +41,14 @@ public class EmailService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** Local development only: anyone who can read the log could otherwise reset any account. */
+    @Value("${app.otp.log-codes:false}")
+    private boolean logCodes;
+
     /**
      * Sends through Resend if RESEND_API_KEY is set, otherwise SMTP if MAIL_USERNAME is set. If
-     * neither delivers, the code is written to the log so password reset still works in local
-     * development. With email configured and working, codes never reach the log.
+     * neither delivers, the code is written to the log only when OTP_LOG_CODES is true (the dev
+     * profile turns it on), so password reset still works in local development.
      */
     public void sendOtpEmail(String toEmail, String username, String otp) {
         String html = buildEmailHtml(username, otp);
@@ -54,8 +58,12 @@ public class EmailService {
         if (mailSender != null && !smtpMailFrom.isBlank() && sendViaSmtp(toEmail, otp, html)) {
             return;
         }
-        log.info("[OTP DISPATCH] Recipient: {} | User: {} | Code: {}", toEmail, username, otp);
-        log.info("No email provider delivered this code. Set RESEND_API_KEY or MAIL_USERNAME and MAIL_PASSWORD to send real emails.");
+        if (logCodes) {
+            log.info("[OTP DISPATCH] Recipient: {} | User: {} | Code: {}", toEmail, username, otp);
+            return;
+        }
+        log.warn("No email provider delivered the password reset code for {}. Set RESEND_API_KEY, or MAIL_USERNAME "
+                + "and MAIL_PASSWORD, to send real emails (or OTP_LOG_CODES=true to log codes in local development).", toEmail);
     }
 
     private boolean sendViaResend(String toEmail, String otp, String html) {
