@@ -4,6 +4,7 @@ Plain HTML, CSS and JavaScript, with no build step. Chart.js is loaded from a CD
 
 - `login.html`, `login.css`, `login.js`: sign in, sign up, and the three-step password reset (request a code, enter it, choose a new password).
 - `index.html`, `style.css`, `app.js`: the dashboard (summary cards, weekly grid, chart, today's habits, top habits) and the profile page.
+- `config.js`, `base.css`: shared by both pages (where the API lives; colours, reset and button/form basics). Each page loads them before its own files.
 - `logo.png`: the logo.
 
 The pages call `/api` on the same address they were loaded from, so serve them with `dev_server.py` from the project root. It forwards `/api` to the backend on port 8080. Opening the files straight from disk won't work.

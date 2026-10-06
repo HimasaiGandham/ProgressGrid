@@ -35,6 +35,7 @@ public class Habit {
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // No getter: only here so deleting a habit also deletes its ticks. The API returns HabitDTO.
     @OneToMany(mappedBy = "habit", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<HabitCompletion> completions;
 
@@ -55,6 +56,4 @@ public class Habit {
     public void setTargetDays(Integer targetDays) { this.targetDays = targetDays; }
     public LocalDate getStartDate() { return startDate; }
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
-    
-    // Ignore completions list serialization to avoid infinite loops, we handle it in DTO
 }
