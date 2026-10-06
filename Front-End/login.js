@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         forgotMsg1.style.color = '#e74c3c';
 
         if (!identifier) {
-            forgotMsg1.innerText = 'Please enter your username, email, or user ID';
+            forgotMsg1.innerText = 'Please enter your username or email';
             return;
         }
 

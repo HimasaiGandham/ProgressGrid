@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -204,6 +205,24 @@ class AuthSecurityTests {
         assertThat(users.findByUsername(a.username()).getPasswordHash()).startsWith("$2");
         login(a.username(), "brand-new-pw").andExpect(status().isOk());
         login(a.username(), a.password()).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void resetCannotBeRequestedByNumericAccountId() throws Exception {
+        Account a = signUp();
+        long id = users.findByUsername(a.username()).getId();
+
+        postJson("/api/auth/forgot-password/send-otp", Map.of("identifier", String.valueOf(id)))
+                .andExpect(status().isBadRequest());
+        verify(emailService, never()).sendOtpEmail(eq(a.email()), any(), any());
+    }
+
+    @Test
+    void resetByUsernameIgnoresCase() throws Exception {
+        Account a = signUp();
+        postJson("/api/auth/forgot-password/send-otp", Map.of("identifier", a.username().toUpperCase()))
+                .andExpect(status().isOk());
+        verify(emailService).sendOtpEmail(eq(a.email()), any(), any());
     }
 
     @Test

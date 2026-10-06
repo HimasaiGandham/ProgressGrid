@@ -16,7 +16,7 @@ src/main/java/com/progressgrid/api/
 
 ## Signing in
 
-Login and signup return a JWT signed with `JWT_SECRET`. Every request to `/api/habits` has to send it as `Authorization: Bearer <token>`. The user id is taken from the token, never from the request, and a habit that belongs to someone else is reported as not found.
+Login and signup return a JWT signed with `JWT_SECRET`. If `JWT_SECRET` isn't set, a random key is generated on first start and kept in `~/.progressgrid/jwt-secret` (or `JWT_SECRET_FILE`), so sessions survive restarts; set `JWT_SECRET` in production. Every request to `/api/habits` has to send it as `Authorization: Bearer <token>`. The user id is taken from the token, never from the request, and a habit that belongs to someone else is reported as not found.
 
 Passwords are stored as BCrypt hashes. Older accounts that still hold a plain-text password, like the seed user, can sign in once with it, and it's hashed on the spot.
 
