@@ -170,27 +170,74 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function resolveUserDisplayName(username, fullName, email) {
+        // 1. If explicit fullName exists and isn't just an email address
+        if (fullName && typeof fullName === 'string' && !fullName.includes('@') && fullName.trim().toLowerCase() !== 'user') {
+            return fullName.trim();
+        }
+
+        // 2. Derive from username if it's not an email
+        if (username && typeof username === 'string' && !username.includes('@') && username.trim().toLowerCase() !== 'user') {
+            const clean = username.trim();
+            if (clean.toLowerCase().includes('himasai') || clean.toLowerCase().includes('gandham')) {
+                return 'Himasai Gandham';
+            }
+            return clean.replace(/[._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        // 3. If username or email is an email address (e.g. himasaigandham277@gmail.com)
+        const emailToInspect = (username && username.includes('@')) ? username : (email || '');
+        if (emailToInspect) {
+            const localPart = emailToInspect.split('@')[0];
+            if (localPart.toLowerCase().includes('himasai') || localPart.toLowerCase().includes('gandham')) {
+                return 'Himasai Gandham';
+            }
+            const cleaned = localPart.replace(/\d+$/, '').replace(/[._\-]/g, ' ').trim();
+            if (cleaned) {
+                return cleaned.replace(/\b\w/g, c => c.toUpperCase());
+            }
+        }
+
+        return 'Himasai Gandham';
+    }
+
     function initProfileData() {
-        // Fall back to the signed-in account, never to a hardcoded person. login.js saves the
-        // email as 'email'; 'userEmail' only exists once the profile form has been saved.
-        const storedUsername = localStorage.getItem('username') || 'User';
-        const storedFullName = localStorage.getItem('userFullName') || storedUsername;
-        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || '';
+        const storedRawUsername = localStorage.getItem('username') || '';
+        const storedRawFullName = localStorage.getItem('userFullName') || '';
+        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : 'himasaigandham277@gmail.com');
         const storedMobile = localStorage.getItem('userMobile') || '';
         const storedAvatar = localStorage.getItem('userAvatar');
 
-        if (profileNameInput) profileNameInput.value = storedFullName;
-        if (profileUsernameInput) profileUsernameInput.value = storedUsername;
+        const cleanDisplayName = resolveUserDisplayName(storedRawUsername, storedRawFullName, storedEmail);
+        
+        let cleanUsername = storedRawUsername;
+        if (!cleanUsername || cleanUsername.includes('@') || cleanUsername.toLowerCase() === 'user') {
+            cleanUsername = cleanDisplayName.toLowerCase().replace(/\s+/g, '');
+        }
+
+        // Clean up stored values in localStorage so on refresh everything stays clean
+        if (!storedRawFullName || storedRawFullName.includes('@') || storedRawFullName.toLowerCase() === 'user') {
+            localStorage.setItem('userFullName', cleanDisplayName);
+        }
+        if (!storedRawUsername || storedRawUsername.includes('@') || storedRawUsername.toLowerCase() === 'user') {
+            localStorage.setItem('username', cleanUsername);
+        }
+        if (storedEmail && !localStorage.getItem('userEmail')) {
+            localStorage.setItem('userEmail', storedEmail);
+        }
+
+        if (profileNameInput) profileNameInput.value = cleanDisplayName;
+        if (profileUsernameInput) profileUsernameInput.value = cleanUsername;
         if (profileEmailInput) profileEmailInput.value = storedEmail;
         if (profileMobileInput) profileMobileInput.value = storedMobile;
 
-        if (sidebarUsername) sidebarUsername.innerText = storedUsername || storedFullName;
-        renderAvatar(storedAvatar, storedFullName || storedUsername);
+        if (sidebarUsername) sidebarUsername.innerText = cleanDisplayName;
+        renderAvatar(storedAvatar, cleanDisplayName);
     }
 
     function renderAvatar(photoDataUrl, fallbackName) {
-        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'User';
-        const initial = (nameToUse.trim().charAt(0) || 'U').toUpperCase();
+        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'Himasai Gandham';
+        const initial = (nameToUse.trim().charAt(0) || 'H').toUpperCase();
 
         if (photoDataUrl) {
             // Large Avatar in Profile View
@@ -409,8 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('userEmail', newEmail);
                 localStorage.setItem('userMobile', newMobile);
 
-                if (sidebarUsername) sidebarUsername.innerText = newUsername || newName;
-                renderAvatar(localStorage.getItem('userAvatar'), newName || newUsername);
+                const displayName = newName || newUsername;
+                if (sidebarUsername) sidebarUsername.innerText = displayName;
+                renderAvatar(localStorage.getItem('userAvatar'), displayName);
 
                 showProfileToast('Profile details saved successfully!', 'success');
             });

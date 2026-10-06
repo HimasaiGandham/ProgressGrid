@@ -9,7 +9,7 @@
     <title>ProgressGrid - Habit Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260924-v2">
+    <link rel="stylesheet" href="style.css?v=20261006-v99">
     <!-- Chart.js for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -44,15 +44,27 @@
                     <p id="currentDateDisplay">September 2026</p>
                 </div>
                 <div class="header-right-area">
-                    <!-- Profile in Top Right Corner on Top of Add Habit -->
+                    <!-- Modern Sleek User Profile Badge -->
                     <div class="top-user-profile" id="userProfileBtn" role="button" tabindex="0" title="Click to view & edit Profile Settings">
-                        <div class="avatar" id="sidebarAvatar">
-                            <span id="sidebarAvatarText">U</span>
-                            <img id="sidebarAvatarImg" src="" alt="User Avatar" style="display: none;">
+                        <div class="avatar-wrapper">
+                            <div class="avatar" id="sidebarAvatar">
+                                <span id="sidebarAvatarText">H</span>
+                                <img id="sidebarAvatarImg" src="" alt="User Avatar" style="display: none;">
+                            </div>
+                            <span class="avatar-status-badge" title="Active"></span>
                         </div>
                         <div class="user-info">
-                            <h4 id="sidebarUsername">User</h4>
-                            <span class="user-role">View Profile</span>
+                            <h4 id="sidebarUsername" class="user-name">Himasai Gandham</h4>
+                            <div class="user-meta-sub">
+                                <span class="user-role" id="sidebarUserRole">View Profile</span>
+                                <span class="role-separator">•</span>
+                                <span class="user-plan-tag">Pro</span>
+                            </div>
+                        </div>
+                        <div class="profile-chevron-wrap">
+                            <svg class="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
                         </div>
                     </div>
 
@@ -533,6 +545,6 @@
     </div>
 </div>
 
-<script src="app.js?v=20260924-v2"></script>
+<script src="app.js?v=20261006-v99"></script>
 </body>
 </html>
