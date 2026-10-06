@@ -1,15 +1,8 @@
 :root {
     --bg-color: #f7f9fa;
     --sidebar-bg: #ffffff;
-    --card-bg: #ffffff;
-    --text-main: #2c3e50;
-    --text-muted: #7f8c8d;
-    --primary-color: #4CAF50;
-    --primary-hover: #45a049;
-    --border-color: #e2e8f0;
     --check-green: #2ecc71;
     --miss-red: #ff7675;
-    --font-family: 'Inter', sans-serif;
     
     /* Heatmap / Completion colors */
     --c-0: #ebedf0;
@@ -19,16 +12,9 @@
     --c-4: #216e39;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
 
 body {
-    font-family: var(--font-family);
     background-color: var(--bg-color);
-    color: var(--text-main);
     line-height: 1.5;
 }
 
@@ -374,19 +360,10 @@ body {
 }
 
 .btn-primary {
-    background: var(--primary-color);
-    color: white;
-    border: none;
     padding: 10px 20px;
-    border-radius: 8px;
     font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
 }
 
-.btn-primary:hover {
-    background: var(--primary-hover);
-}
 
 .btn-secondary {
     background: #f1f5f9;
@@ -735,10 +712,7 @@ body {
 }
 
 .form-group label {
-    display: block;
     margin-bottom: 5px;
-    font-weight: 500;
-    font-size: 14px;
 }
 
 .form-group input, .form-group select {
