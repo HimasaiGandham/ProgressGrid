@@ -1,7 +1,3 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io');
-const BACKEND_BASE = (window.location.port === '3000' || window.location.port === '8080')
-    ? window.location.origin
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : window.location.origin);
 const API_URL = `${BACKEND_BASE}/api/auth`;
 
 // Helper for demo user accounts stored in browser localStorage
@@ -11,18 +7,6 @@ function getDemoUsers() {
         users = JSON.parse(localStorage.getItem('pg_demo_users') || '{}');
     } catch (e) {
         users = {};
-    }
-    // Pre-seed primary verified account so it's always recognized
-    const primary = {
-        username: 'himasaigandham277',
-        email: 'himasaigandham277@gmail.com',
-        password: 'iasiasiasiasias9988'
-    };
-    if (!users['himasaigandham277@gmail.com']) {
-        users['himasaigandham277@gmail.com'] = primary;
-    }
-    if (!users['himasaigandham277']) {
-        users['himasaigandham277'] = primary;
     }
     return users;
 }

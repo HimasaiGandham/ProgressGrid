@@ -1,7 +1,3 @@
-const isGitHubPages = window.location.hostname.endsWith('github.io');
-const BACKEND_BASE = (window.location.port === '3000' || window.location.port === '8080')
-    ? window.location.origin
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : window.location.origin);
 const API_URL = `${BACKEND_BASE}/api/habits`;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -184,32 +180,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Derive from username if it's not an email
         if (username && typeof username === 'string' && !username.includes('@') && username.trim().toLowerCase() !== 'user') {
             const clean = username.trim();
-            if (clean.toLowerCase().includes('himasai') || clean.toLowerCase().includes('gandham')) {
-                return 'Himasai Gandham';
-            }
             return clean.replace(/[._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         }
 
-        // 3. If username or email is an email address (e.g. himasaigandham277@gmail.com)
+        // 3. If username or email is an email address (e.g. jane.doe42@example.com)
         const emailToInspect = (username && username.includes('@')) ? username : (email || '');
         if (emailToInspect) {
             const localPart = emailToInspect.split('@')[0];
-            if (localPart.toLowerCase().includes('himasai') || localPart.toLowerCase().includes('gandham')) {
-                return 'Himasai Gandham';
-            }
             const cleaned = localPart.replace(/\d+$/, '').replace(/[._\-]/g, ' ').trim();
             if (cleaned) {
                 return cleaned.replace(/\b\w/g, c => c.toUpperCase());
             }
         }
 
-        return 'Himasai Gandham';
+        return 'User';
     }
 
     function initProfileData() {
         const storedRawUsername = localStorage.getItem('username') || '';
         const storedRawFullName = localStorage.getItem('userFullName') || '';
-        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : 'himasaigandham277@gmail.com');
+        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : '');
         const storedMobile = localStorage.getItem('userMobile') || '';
         const storedAvatar = localStorage.getItem('userAvatar');
 
@@ -241,8 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAvatar(photoDataUrl, fallbackName) {
-        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'Himasai Gandham';
-        const initial = (nameToUse.trim().charAt(0) || 'H').toUpperCase();
+        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'User';
+        const initial = (nameToUse.trim().charAt(0) || 'U').toUpperCase();
 
         if (photoDataUrl) {
             // Large Avatar in Profile View
