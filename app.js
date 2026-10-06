@@ -78,16 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const d1 = formatDateIso(new Date(Date.now() - 86400000));
         const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
         const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
-        return [
+        const defaultList = [
             {
                 id: 101,
                 name: 'Morning Workout & Stretch',
                 category: 'Health',
                 frequency: 'DAILY',
                 startDate: d3,
-                currentStreak: 3,
-                bestStreak: 5,
-                completionPercentage: 85,
                 completions: [today, d1, d2]
             },
             {
@@ -96,9 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 category: 'Productivity',
                 frequency: 'DAILY',
                 startDate: d3,
-                currentStreak: 4,
-                bestStreak: 8,
-                completionPercentage: 100,
                 completions: [today, d1, d2, d3]
             },
             {
@@ -107,9 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 category: 'Health',
                 frequency: 'DAILY',
                 startDate: d2,
-                currentStreak: 2,
-                bestStreak: 4,
-                completionPercentage: 75,
                 completions: [today, d1]
             },
             {
@@ -118,12 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 category: 'Work',
                 frequency: 'WEEKLY',
                 startDate: d3,
-                currentStreak: 1,
-                bestStreak: 3,
-                completionPercentage: 100,
                 completions: [today]
             }
         ];
+        defaultList.forEach(recalculateHabitStats);
+        return defaultList;
     }
 
     function getStoredHabits() {
@@ -516,17 +506,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await api('', { method: 'POST', body: JSON.stringify(habit) });
             if (!res || !res.ok) {
                 const current = getStoredHabits();
-                current.push({
+                const newHabit = {
                     id: Date.now(),
                     name: habit.name,
                     category: habit.category,
                     frequency: habit.frequency,
                     startDate: habit.startDate,
-                    currentStreak: 0,
-                    bestStreak: 0,
-                    completionPercentage: 0,
                     completions: []
-                });
+                };
+                recalculateHabitStats(newHabit);
+                current.push(newHabit);
                 saveStoredHabits(current);
             }
 
@@ -574,7 +563,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 habit.currentStreak = currentList[storedIndex].currentStreak;
                 habit.bestStreak = currentList[storedIndex].bestStreak;
                 habit.completionPercentage = currentList[storedIndex].completionPercentage;
+                habit.completedDays = currentList[storedIndex].completedDays;
                 saveStoredHabits(currentList);
+            } else {
+                recalculateHabitStats(habit);
             }
 
             renderDashboard();
@@ -608,6 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
             h.start = String(h.startDate || formatDateIso(new Date())).split('T')[0];
             recalculateHabitStats(h);
         });
+        if (!loadedFromServer) {
+            saveStoredHabits(habits);
+        }
         renderDashboard();
         if (statsView && statsView.style.display !== 'none') {
             renderStatsView(currentStatsTimeframe);
@@ -1455,8 +1450,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><strong>${esc(h.name)}</strong></td>
                     <td><span class="cat-legend-item" style="padding: 2px 8px; font-size: 11.5px;">${esc(h.category || 'General')}</span></td>
                     <td>${isWeekly(h) ? 'Weekly' : 'Daily'}</td>
-                    <td><span style="font-weight: 600; color: #ea580c;">${streak} day${streak === 1 ? '' : 's'}</span></td>
-                    <td><span style="font-weight: 600; color: #ca8a04;">${best} day${best === 1 ? '' : 's'}</span></td>
+                    <td><span style="font-weight: 600; color: #ea580c;">${streakText(h, streak)}</span></td>
+                    <td><span style="font-weight: 600; color: #ca8a04;">${streakText(h, best)}</span></td>
                     <td><strong>${checkIns}</strong></td>
                     <td>
                         <div class="progress-bar-wrap">
@@ -1487,74 +1482,88 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // STATS CALCULATION LOGIC
     // ==========================================
+    function parseDateParts(d) {
+        if (!d) return null;
+        if (d instanceof Date) {
+            return {
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                day: d.getDate()
+            };
+        }
+        const str = String(d).split('T')[0];
+        const parts = str.split('-');
+        if (parts.length !== 3) return null;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        if (isNaN(y) || isNaN(m) || isNaN(day)) return null;
+        return { year: y, month: m, day };
+    }
+
+    // Convert date string or Date object to integer epoch days (UTC midnight based).
+    // Pure calendar day integer: immune to local browser timezone or DST shifts.
+    function toEpochDays(d) {
+        const p = parseDateParts(d);
+        if (!p) return null;
+        return Math.floor(Date.UTC(p.year, p.month - 1, p.day) / 86400000);
+    }
+
+    // For weekly habits, period is Monday of that week
+    function periodOfDays(epochDays, weekly) {
+        if (!weekly) return epochDays;
+        const d = new Date(epochDays * 86400000);
+        const dayOfWeek = d.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+        const diffToMonday = dayOfWeek === 0 ? 6 : (dayOfWeek - 1);
+        return epochDays - diffToMonday;
+    }
+
     function recalculateHabitStats(habit) {
         const weekly = isWeekly(habit);
         const step = weekly ? 7 : 1;
-        const now = periodOf(new Date(), weekly);
-        const first = periodOf(new Date(habit.startDate || new Date()), weekly);
-        
+        const todayDays = toEpochDays(new Date());
+        const startDays = toEpochDays(habit.startDate) ?? todayDays;
+
+        const now = periodOfDays(todayDays, weekly);
+        const first = periodOfDays(startDays, weekly);
+
         const doneSet = new Set();
         (habit.completions || []).forEach(dStr => {
-            const d = new Date(dStr);
-            if (isNaN(d.getTime())) return;
-            const p = periodOf(d, weekly);
+            const ed = toEpochDays(dStr);
+            if (ed === null) return;
+            const p = periodOfDays(ed, weekly);
             if (p >= first && p <= now) {
-                doneSet.add(p.getTime());
+                doneSet.add(p);
             }
         });
-        
+
         const done = Array.from(doneSet).sort((a, b) => a - b);
-        
+
         let best = 0;
         let run = 0;
         let previous = null;
-        
-        done.forEach(time => {
-            const period = new Date(time);
-            if (previous !== null) {
-                const diffTime = period.getTime() - previous.getTime();
-                const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-                if (diffDays === step) {
-                    run += 1;
-                } else {
-                    run = 1;
-                }
-            } else {
-                run = 1;
-            }
-            if (run > best) best = run;
+        for (const period of done) {
+            run = (previous !== null && period - step === previous) ? run + 1 : 1;
+            best = Math.max(best, run);
             previous = period;
-        });
-        
-        let current = 0;
-        if (done.length > 0) {
-            const lastTime = done[done.length - 1];
-            const diffTime = now.getTime() - lastTime;
-            const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-            if (diffDays === 0 || diffDays === step) {
-                current = run;
-            }
         }
-        
-        let totalPeriods = Math.floor(Math.round((now.getTime() - first.getTime()) / (1000 * 3600 * 24)) / step) + 1;
-        if (totalPeriods < 1) totalPeriods = 1;
-        let pct = Math.round((done.length * 100) / totalPeriods);
-        if (pct > 100) pct = 100;
-        
+
+        // Today (or this week) may simply not be done yet, so a run ending one period back still counts.
+        let current = 0;
+        let p = doneSet.has(now) ? now : now - step;
+        while (doneSet.has(p)) {
+            current++;
+            p -= step;
+        }
+
+        const daysBetween = now - first;
+        const periods = Math.max(1, Math.floor(daysBetween / step) + 1);
+        const completionPercentage = Math.min(100, Math.round((100.0 * done.length) / periods));
+
         habit.currentStreak = current;
         habit.bestStreak = best;
-        habit.completionPercentage = pct;
-    }
-
-    function periodOf(date, weekly) {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        if (weekly) {
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            d.setDate(diff);
-        }
-        return d;
+        habit.completionPercentage = completionPercentage;
+        habit.completedDays = (habit.completions || []).length;
     }
 
     // ==========================================
