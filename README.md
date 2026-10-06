@@ -383,7 +383,7 @@ python ../dev_server.py        # in another terminal, then open http://localhost
 
 ## Where the site sends its requests
 
-`Front-End/app.js` and `login.js` pick the API address from the page's own address:
+`Front-End/config.js` (loaded by both pages) picks the API address from the page's own address:
 
 | Site opened from | API used |
 |---|---|
@@ -400,7 +400,9 @@ python ../dev_server.py        # in another terminal, then open http://localhost
 - habits and ticks are saved in that browser's `localStorage` only. They aren't synced between devices or browsers, and clearing site data deletes them;
 - streaks and percentages are rough client-side estimates, not the server's scoring.
 
-Use the Pages site as a UI preview. Don't use it for real accounts or data.
+Use the [live Pages site](https://himasaigandham.github.io/ProgressGrid/login.html) as a UI preview. Don't use it for real accounts or data.
+
+**Demo mode can also switch on outside GitHub Pages.** On any host, `login.js` quietly falls back to demo sign-in and sign-up when the API answers `404`/`405` or can't be reached, and the reset form accepts `123456` at the code step without asking the API. So a deployment whose `/api` isn't routed correctly still looks as if sign-in works, but nothing is saved on the server. If habits don't sync between browsers, or the session token in `localStorage` starts with `demo-`, the site can't reach `/api`.
 
 ## Full-stack deployment
 
@@ -429,10 +431,12 @@ Read by `Back-End/src/main/resources/application.properties`:
 | `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3306/progressgrid_db?...` | Database JDBC URL |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `pg_user` / `password123` | Database login (**change in production**) |
 | `SPRING_DATASOURCE_DRIVER` | `com.mysql.cj.jdbc.Driver` | JDBC driver class |
-| `JWT_SECRET` | *(none)* | Signs login tokens. **Required in production**: 32+ random characters |
+| `JWT_SECRET` | *(none)*: a random key is generated once and kept in `JWT_SECRET_FILE` | Signs login tokens. **Required in production**: 32+ random characters |
+| `JWT_SECRET_FILE` | `~/.progressgrid/jwt-secret` | Where the generated key is kept when `JWT_SECRET` isn't set, so sessions survive restarts |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | How long a login lasts |
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | *(none)* / `ProgressGrid <onboarding@resend.dev>` | Send password reset emails through [Resend](https://resend.com) |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | `smtp.gmail.com` / `587` / *(none)* / *(none)* | SMTP fallback for reset emails |
+| `OTP_LOG_CODES` | `false` (`true` in the `dev` profile) | Print reset codes in the backend log when no email provider delivers them. **Never enable in production**: anyone who can read the log could reset any account |
 
 ---
 
