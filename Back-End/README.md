@@ -36,7 +36,13 @@ A tick has to fall between the habit's start date and today; anything else gets 
 mvn spring-boot:run
 ```
 
-It starts on port 8080 and needs the MySQL database from `Data-Base/schema.sql`. Settings are in `src/main/resources/application.properties`, and the environment variables it reads are listed in the main README.
+It starts on port 8080 and needs the MySQL database from `Data-Base/schema.sql`. To run without MySQL, use the in-memory H2 profile (data is lost on stop):
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Settings are in `src/main/resources/application.properties`. The environment variables it reads, and how to deploy the API together with the site, are in the main README under "Running ProgressGrid".
 
 ## Tests
 
