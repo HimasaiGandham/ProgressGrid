@@ -1,6 +1,7 @@
 package com.progressgrid.api.service;
 
 import com.progressgrid.api.dto.HabitDTO;
+import com.progressgrid.api.dto.HabitStatsDTO;
 import com.progressgrid.api.model.Habit;
 import com.progressgrid.api.model.HabitCategory;
 import com.progressgrid.api.model.HabitCompletion;
@@ -16,9 +17,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.List;
-import java.util.Optional;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +34,113 @@ public class HabitService {
 
     public List<HabitDTO> getAllHabits(Long userId) {
         return habitRepository.findByUserId(userId).stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    public HabitStatsDTO getHabitStats(Long userId) {
+        List<HabitDTO> habits = getAllHabits(userId);
+        HabitStatsDTO stats = new HabitStatsDTO();
+        stats.setTotalHabits(habits.size());
+
+        if (habits.isEmpty()) {
+            stats.setCategoryCounts(Collections.emptyMap());
+            stats.setCategoryCompletionRates(Collections.emptyMap());
+            stats.setDayOfWeekCompletionRates(Collections.emptyMap());
+            stats.setTopHabits(Collections.emptyList());
+            return stats;
+        }
+
+        int totalTicks = 0;
+        int bestStreak = 0;
+        int currentStreak = 0;
+        int sumCompletion = 0;
+
+        Map<String, Integer> categoryCounts = new HashMap<>();
+        Map<String, Integer> categorySums = new HashMap<>();
+        Map<DayOfWeek, Integer> dayOfWeekTicks = new HashMap<>();
+
+        for (HabitDTO h : habits) {
+            List<LocalDate> comp = h.getCompletions();
+            int compSize = comp != null ? comp.size() : 0;
+            totalTicks += compSize;
+
+            if (h.getBestStreak() != null && h.getBestStreak() > bestStreak) {
+                bestStreak = h.getBestStreak();
+            }
+            if (h.getCurrentStreak() != null && h.getCurrentStreak() > currentStreak) {
+                currentStreak = h.getCurrentStreak();
+            }
+            int pct = h.getCompletionPercentage() != null ? h.getCompletionPercentage() : 0;
+            sumCompletion += pct;
+
+            String cat = (h.getCategory() != null && !h.getCategory().isBlank()) ? h.getCategory() : "General";
+            categoryCounts.put(cat, categoryCounts.getOrDefault(cat, 0) + 1);
+            categorySums.put(cat, categorySums.getOrDefault(cat, 0) + pct);
+
+            if (comp != null) {
+                for (LocalDate d : comp) {
+                    dayOfWeekTicks.put(d.getDayOfWeek(), dayOfWeekTicks.getOrDefault(d.getDayOfWeek(), 0) + 1);
+                }
+            }
+        }
+
+        stats.setTotalCompletions(totalTicks);
+        stats.setBestStreak(bestStreak);
+        stats.setCurrentStreak(currentStreak);
+        stats.setOverallCompletionPercentage((int) Math.round((double) sumCompletion / habits.size()));
+
+        Map<String, Integer> categoryRates = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
+            int count = entry.getValue();
+            int totalPct = categorySums.getOrDefault(entry.getKey(), 0);
+            categoryRates.put(entry.getKey(), (int) Math.round((double) totalPct / count));
+        }
+
+        Map<String, Integer> dayOfWeekRates = new LinkedHashMap<>();
+        DayOfWeek[] daysOrder = {
+            DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+            DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
+        };
+        for (DayOfWeek dow : daysOrder) {
+            dayOfWeekRates.put(dow.name().substring(0, 3), dayOfWeekTicks.getOrDefault(dow, 0));
+        }
+
+        // Count perfect days in the last 30 days
+        LocalDate today = LocalDate.now();
+        int perfectDaysCount = 0;
+        List<HabitDTO> dailyHabits = habits.stream()
+                .filter(h -> !"weekly".equalsIgnoreCase(h.getFrequency()))
+                .collect(Collectors.toList());
+
+        if (!dailyHabits.isEmpty()) {
+            for (int i = 0; i < 30; i++) {
+                LocalDate d = today.minusDays(i);
+                List<HabitDTO> activeOnDay = dailyHabits.stream()
+                        .filter(h -> !d.isBefore(h.getStartDate()))
+                        .collect(Collectors.toList());
+                if (!activeOnDay.isEmpty()) {
+                    boolean allDone = activeOnDay.stream()
+                            .allMatch(h -> h.getCompletions() != null && h.getCompletions().contains(d));
+                    if (allDone) {
+                        perfectDaysCount++;
+                    }
+                }
+            }
+        }
+        stats.setPerfectDays(perfectDaysCount);
+
+        List<HabitDTO> topHabits = habits.stream()
+                .sorted((a, b) -> Integer.compare(
+                        b.getCompletionPercentage() != null ? b.getCompletionPercentage() : 0,
+                        a.getCompletionPercentage() != null ? a.getCompletionPercentage() : 0))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        stats.setCategoryCounts(categoryCounts);
+        stats.setCategoryCompletionRates(categoryRates);
+        stats.setDayOfWeekCompletionRates(dayOfWeekRates);
+        stats.setTopHabits(topHabits);
+
+        return stats;
     }
 
     public HabitDTO createHabit(Long userId, HabitDTO dto) {

@@ -29,11 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Tabs & Profile Elements
     const dashboardView = document.getElementById('dashboardView');
+    const statsView = document.getElementById('statsView');
     const profileView = document.getElementById('profileView');
+    const calendarView = document.getElementById('calendarView');
     const navDashboard = document.getElementById('navDashboard');
+    const navHabits = document.getElementById('navHabits');
+    const navStats = document.getElementById('navStats');
+    const navCalendar = document.getElementById('navCalendar');
     const navSettings = document.getElementById('navSettings');
     const userProfileBtn = document.getElementById('userProfileBtn');
     const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+    const statsBackToDashboardBtn = document.getElementById('statsBackToDashboardBtn');
+    const goToStatsBtn = document.getElementById('goToStatsBtn');
     const sidebarUsername = document.getElementById('sidebarUsername');
     const sidebarAvatarText = document.getElementById('sidebarAvatarText');
     const sidebarAvatarImg = document.getElementById('sidebarAvatarImg');
@@ -53,8 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileAlertMsg = document.getElementById('profileAlertMsg');
     const clearFieldsBtn = document.getElementById('clearFieldsBtn');
 
-    // Chart
+    // Charts & Analytics Instances
     let weeklyChartInstance = null;
+    let statsTrendChartInstance = null;
+    let statsCategoryChartInstance = null;
+    let statsDayOfWeekChartInstance = null;
+    let currentStatsTimeframe = '30days';
 
     // Init
     init();
@@ -164,27 +175,74 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function resolveUserDisplayName(username, fullName, email) {
+        // 1. If explicit fullName exists and isn't just an email address
+        if (fullName && typeof fullName === 'string' && !fullName.includes('@') && fullName.trim().toLowerCase() !== 'user') {
+            return fullName.trim();
+        }
+
+        // 2. Derive from username if it's not an email
+        if (username && typeof username === 'string' && !username.includes('@') && username.trim().toLowerCase() !== 'user') {
+            const clean = username.trim();
+            if (clean.toLowerCase().includes('himasai') || clean.toLowerCase().includes('gandham')) {
+                return 'Himasai Gandham';
+            }
+            return clean.replace(/[._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        // 3. If username or email is an email address (e.g. himasaigandham277@gmail.com)
+        const emailToInspect = (username && username.includes('@')) ? username : (email || '');
+        if (emailToInspect) {
+            const localPart = emailToInspect.split('@')[0];
+            if (localPart.toLowerCase().includes('himasai') || localPart.toLowerCase().includes('gandham')) {
+                return 'Himasai Gandham';
+            }
+            const cleaned = localPart.replace(/\d+$/, '').replace(/[._\-]/g, ' ').trim();
+            if (cleaned) {
+                return cleaned.replace(/\b\w/g, c => c.toUpperCase());
+            }
+        }
+
+        return 'Himasai Gandham';
+    }
+
     function initProfileData() {
-        // Fall back to the signed-in account, never to a hardcoded person. login.js saves the
-        // email as 'email'; 'userEmail' only exists once the profile form has been saved.
-        const storedUsername = localStorage.getItem('username') || 'User';
-        const storedFullName = localStorage.getItem('userFullName') || storedUsername;
-        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || '';
+        const storedRawUsername = localStorage.getItem('username') || '';
+        const storedRawFullName = localStorage.getItem('userFullName') || '';
+        const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('email') || (storedRawUsername.includes('@') ? storedRawUsername : 'himasaigandham277@gmail.com');
         const storedMobile = localStorage.getItem('userMobile') || '';
         const storedAvatar = localStorage.getItem('userAvatar');
 
-        if (profileNameInput) profileNameInput.value = storedFullName;
-        if (profileUsernameInput) profileUsernameInput.value = storedUsername;
+        const cleanDisplayName = resolveUserDisplayName(storedRawUsername, storedRawFullName, storedEmail);
+        
+        let cleanUsername = storedRawUsername;
+        if (!cleanUsername || cleanUsername.includes('@') || cleanUsername.toLowerCase() === 'user') {
+            cleanUsername = cleanDisplayName.toLowerCase().replace(/\s+/g, '');
+        }
+
+        // Clean up stored values in localStorage so on refresh everything stays clean
+        if (!storedRawFullName || storedRawFullName.includes('@') || storedRawFullName.toLowerCase() === 'user') {
+            localStorage.setItem('userFullName', cleanDisplayName);
+        }
+        if (!storedRawUsername || storedRawUsername.includes('@') || storedRawUsername.toLowerCase() === 'user') {
+            localStorage.setItem('username', cleanUsername);
+        }
+        if (storedEmail && !localStorage.getItem('userEmail')) {
+            localStorage.setItem('userEmail', storedEmail);
+        }
+
+        if (profileNameInput) profileNameInput.value = cleanDisplayName;
+        if (profileUsernameInput) profileUsernameInput.value = cleanUsername;
         if (profileEmailInput) profileEmailInput.value = storedEmail;
         if (profileMobileInput) profileMobileInput.value = storedMobile;
 
-        if (sidebarUsername) sidebarUsername.innerText = storedUsername || storedFullName;
-        renderAvatar(storedAvatar, storedFullName || storedUsername);
+        if (sidebarUsername) sidebarUsername.innerText = cleanDisplayName;
+        renderAvatar(storedAvatar, cleanDisplayName);
     }
 
     function renderAvatar(photoDataUrl, fallbackName) {
-        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'User';
-        const initial = (nameToUse.trim().charAt(0) || 'U').toUpperCase();
+        const nameToUse = fallbackName || (profileNameInput ? profileNameInput.value : '') || localStorage.getItem('userFullName') || localStorage.getItem('username') || 'Himasai Gandham';
+        const initial = (nameToUse.trim().charAt(0) || 'H').toUpperCase();
 
         if (photoDataUrl) {
             // Large Avatar in Profile View
@@ -230,17 +288,43 @@ document.addEventListener('DOMContentLoaded', () => {
         // Tab Navigation
         function showDashboard() {
             if (dashboardView) dashboardView.style.display = 'block';
+            if (statsView) statsView.style.display = 'none';
             if (profileView) profileView.style.display = 'none';
+            if (calendarView) calendarView.style.display = 'none';
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
             if (navDashboard) navDashboard.classList.add('active');
-            if (navSettings) navSettings.classList.remove('active');
         }
 
         function showProfile() {
             if (dashboardView) dashboardView.style.display = 'none';
+            if (statsView) statsView.style.display = 'none';
+            if (calendarView) calendarView.style.display = 'none';
             if (profileView) profileView.style.display = 'block';
-            if (navDashboard) navDashboard.classList.remove('active');
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
             if (navSettings) navSettings.classList.add('active');
             initProfileData();
+        }
+
+        function showStats() {
+            if (dashboardView) dashboardView.style.display = 'none';
+            if (profileView) profileView.style.display = 'none';
+            if (calendarView) calendarView.style.display = 'none';
+            if (statsView) statsView.style.display = 'block';
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+            if (navStats) navStats.classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            renderStatsView(currentStatsTimeframe);
+        }
+
+        function showCalendar() {
+            if (dashboardView) dashboardView.style.display = 'none';
+            if (profileView) profileView.style.display = 'none';
+            if (statsView) statsView.style.display = 'none';
+            if (calendarView) calendarView.style.display = 'block';
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+            if (navCalendar) navCalendar.classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            initCalendar();
         }
 
         // When pressing on their name or profile details in the left corner
@@ -253,50 +337,70 @@ document.addEventListener('DOMContentLoaded', () => {
                 showProfile();
             });
         }
+        if (backToDashboardBtn) {
+            backToDashboardBtn.addEventListener('click', () => {
+                showDashboard();
+            });
+        }
+        if (statsBackToDashboardBtn) {
+            statsBackToDashboardBtn.addEventListener('click', () => {
+                showDashboard();
+            });
+        }
+        if (goToStatsBtn) {
+            goToStatsBtn.addEventListener('click', () => {
+                showStats();
+            });
+        }
+
         // Sidebar Nav links: switch views and smoothly scroll to active sections
         if (navDashboard) {
             navDashboard.addEventListener('click', (e) => {
                 e.preventDefault();
-                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-                navDashboard.classList.add('active');
                 showDashboard();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         }
 
-        const navHabits = document.getElementById('navHabits');
         if (navHabits) {
             navHabits.addEventListener('click', (e) => {
                 e.preventDefault();
-                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-                navHabits.classList.add('active');
                 showDashboard();
                 const gridSection = document.querySelector('.habit-grid-section');
                 if (gridSection) gridSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         }
 
-        const navStats = document.getElementById('navStats');
         if (navStats) {
             navStats.addEventListener('click', (e) => {
                 e.preventDefault();
-                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-                navStats.classList.add('active');
-                showDashboard();
-                const chartCard = document.querySelector('.weekly-chart-card') || document.querySelector('.summary-cards');
-                if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                showStats();
             });
         }
 
-        const navCalendar = document.getElementById('navCalendar');
         if (navCalendar) {
             navCalendar.addEventListener('click', (e) => {
                 e.preventDefault();
-                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-                navCalendar.classList.add('active');
-                showDashboard();
-                const weekNav = document.querySelector('.week-nav');
-                if (weekNav) weekNav.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showCalendar();
+            });
+        }
+
+        const statsTimeframeSelector = document.getElementById('statsTimeframeSelector');
+        if (statsTimeframeSelector) {
+            statsTimeframeSelector.addEventListener('click', (e) => {
+                const btn = e.target.closest('.pill-btn');
+                if (!btn) return;
+                statsTimeframeSelector.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentStatsTimeframe = btn.dataset.timeframe;
+                renderStatsView(currentStatsTimeframe);
+            });
+        }
+
+        const statsHabitSearch = document.getElementById('statsHabitSearch');
+        if (statsHabitSearch) {
+            statsHabitSearch.addEventListener('input', (e) => {
+                filterLeaderboardTable(e.target.value.trim().toLowerCase());
             });
         }
 
@@ -357,8 +461,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('userEmail', newEmail);
                 localStorage.setItem('userMobile', newMobile);
 
-                if (sidebarUsername) sidebarUsername.innerText = newUsername || newName;
-                renderAvatar(localStorage.getItem('userAvatar'), newName || newUsername);
+                const displayName = newName || newUsername;
+                if (sidebarUsername) sidebarUsername.innerText = displayName;
+                renderAvatar(localStorage.getItem('userAvatar'), displayName);
 
                 showProfileToast('Profile details saved successfully!', 'success');
             });
@@ -473,9 +578,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const storedIndex = currentList.findIndex(h => h.id === habit.id);
             if (storedIndex !== -1) {
                 currentList[storedIndex].completions = habit.completions;
-                currentList[storedIndex].currentStreak = habit.completions.length;
-                currentList[storedIndex].bestStreak = Math.max(currentList[storedIndex].bestStreak || 0, habit.completions.length);
-                currentList[storedIndex].completionPercentage = habit.completions.length > 0 ? Math.min(100, habit.completions.length * 20) : 0;
+                recalculateHabitStats(currentList[storedIndex]);
+                habit.currentStreak = currentList[storedIndex].currentStreak;
+                habit.bestStreak = currentList[storedIndex].bestStreak;
+                habit.completionPercentage = currentList[storedIndex].completionPercentage;
                 saveStoredHabits(currentList);
             }
 
@@ -508,8 +614,12 @@ document.addEventListener('DOMContentLoaded', () => {
         habits.forEach(h => {
             h.completionsSet = new Set(h.completions || []);
             h.start = String(h.startDate || formatDateIso(new Date())).split('T')[0];
+            recalculateHabitStats(h);
         });
         renderDashboard();
+        if (statsView && statsView.style.display !== 'none') {
+            renderStatsView(currentStatsTimeframe);
+        }
     }
 
     function renderDashboard() {
@@ -784,6 +894,808 @@ document.addEventListener('DOMContentLoaded', () => {
             weeklyChartInstance.dayTotals = dayTotals;
         }
     }
+
+    // ==========================================================================
+    // STATISTICS & ANALYTICS VIEW LOGIC
+    // ==========================================================================
+
+    function renderStatsView(timeframe = '30days') {
+        if (!statsView) return;
+
+        const todayObj = new Date();
+        const todayIso = formatDateIso(todayObj);
+
+        // Determine timeframe date range
+        let startDateObj = new Date(todayObj);
+        if (timeframe === 'week') {
+            startDateObj.setDate(todayObj.getDate() - 6);
+        } else if (timeframe === 'month') {
+            startDateObj = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1);
+        } else if (timeframe === '30days') {
+            startDateObj.setDate(todayObj.getDate() - 29);
+        } else if (timeframe === 'all') {
+            let earliest = todayIso;
+            habits.forEach(h => {
+                if (h.start && h.start < earliest) earliest = h.start;
+                if (h.completions) {
+                    h.completions.forEach(c => {
+                        if (c < earliest) earliest = c;
+                    });
+                }
+            });
+            startDateObj = new Date(earliest + 'T00:00:00');
+            const minDaysAgo = new Date(todayObj);
+            minDaysAgo.setDate(minDaysAgo.getDate() - 14);
+            if (startDateObj > minDaysAgo) startDateObj = minDaysAgo;
+        }
+
+        // Generate date list for range
+        const dateList = [];
+        const iter = new Date(startDateObj);
+        while (formatDateIso(iter) <= todayIso) {
+            dateList.push(formatDateIso(iter));
+            iter.setDate(iter.getDate() + 1);
+        }
+
+        // 1. KPI Calculations
+        let totalCheckIns = 0;
+        let currentStreakMax = 0;
+        let currentStreakHabit = 'None';
+        let bestStreakMax = 0;
+        let bestStreakHabit = 'None';
+
+        habits.forEach(h => {
+            const count = h.completions ? h.completions.length : 0;
+            totalCheckIns += count;
+
+            if ((h.currentStreak || 0) > currentStreakMax) {
+                currentStreakMax = h.currentStreak || 0;
+                currentStreakHabit = h.name;
+            }
+            if ((h.bestStreak || 0) > bestStreakMax) {
+                bestStreakMax = h.bestStreak || 0;
+                bestStreakHabit = h.name;
+            }
+        });
+
+        let totalDue = 0;
+        let totalDone = 0;
+        const dailyRateMap = {};
+
+        dateList.forEach(iso => {
+            const dueHabits = habits.filter(h => !isWeekly(h) && h.start <= iso);
+            const doneHabits = dueHabits.filter(h => h.completionsSet.has(iso));
+            const dueCount = dueHabits.length;
+            const doneCount = doneHabits.length;
+            const pct = dueCount > 0 ? Math.round((doneCount * 100) / dueCount) : 0;
+
+            dailyRateMap[iso] = { due: dueCount, done: doneCount, pct };
+            totalDue += dueCount;
+            totalDone += doneCount;
+        });
+
+        // Perfect Days
+        let perfectDays = 0;
+        dateList.forEach(iso => {
+            const d = dailyRateMap[iso];
+            if (d && d.due > 0 && d.done === d.due) {
+                perfectDays++;
+            }
+        });
+
+        // Overall consistency percentage
+        let overallConsistency = totalDue > 0
+            ? Math.round((totalDone * 100) / totalDue)
+            : (habits.length ? Math.round(habits.reduce((sum, h) => sum + (h.completionPercentage || 0), 0) / habits.length) : 0);
+
+        // Update KPI DOM
+        const rateEl = document.getElementById('statsOverallRate');
+        if (rateEl) rateEl.innerText = `${overallConsistency}%`;
+
+        const subtextEl = document.getElementById('statsOverallSubtext');
+        if (subtextEl) {
+            if (overallConsistency >= 80) subtextEl.innerText = 'Exceptional discipline! 🌟';
+            else if (overallConsistency >= 60) subtextEl.innerText = 'Solid consistency! Keep it up ⚡';
+            else if (overallConsistency >= 40) subtextEl.innerText = 'Building momentum! 🌱';
+            else subtextEl.innerText = 'Ready to build new momentum 🎯';
+        }
+
+        const currStreakEl = document.getElementById('statsCurrentStreak');
+        if (currStreakEl) currStreakEl.innerText = `${currentStreakMax} day${currentStreakMax === 1 ? '' : 's'}`;
+        const currStreakHabitEl = document.getElementById('statsCurrentStreakHabit');
+        if (currStreakHabitEl) currStreakHabitEl.innerText = currentStreakMax > 0 ? `🔥 ${esc(currentStreakHabit)}` : 'No active streak';
+
+        const bestStreakEl = document.getElementById('statsBestStreak');
+        if (bestStreakEl) bestStreakEl.innerText = `${bestStreakMax} day${bestStreakMax === 1 ? '' : 's'}`;
+        const bestStreakHabitEl = document.getElementById('statsBestStreakHabit');
+        if (bestStreakHabitEl) bestStreakHabitEl.innerText = bestStreakMax > 0 ? `🏆 ${esc(bestStreakHabit)}` : 'Personal record';
+
+        const totalTicksEl = document.getElementById('statsTotalCompletions');
+        if (totalTicksEl) totalTicksEl.innerText = totalCheckIns;
+
+        const perfectDaysEl = document.getElementById('statsPerfectDays');
+        if (perfectDaysEl) perfectDaysEl.innerText = perfectDays;
+
+        // 2. Render Smart Insights
+        renderSmartInsights(dateList, dailyRateMap, habits, overallConsistency, currentStreakMax, currentStreakHabit);
+
+        // 3. Render Consistency Trajectory Chart
+        renderStatsTrendChart(dateList, dailyRateMap);
+
+        // 4. Render Category Donut Chart
+        renderStatsCategoryChart();
+
+        // 5. Render Day of Week Discipline Chart
+        renderStatsDayOfWeekChart(dateList, dailyRateMap);
+
+        // 6. Render Heatmap Matrix
+        renderStatsHeatmapMatrix(todayObj);
+
+        // 7. Render Leaderboard Table
+        renderLeaderboardTable();
+    }
+
+    function renderSmartInsights(dateList, dailyRateMap, habits, overallRate, currentStreak, currentStreakHabit) {
+        const grid = document.getElementById('statsInsightsGrid');
+        if (!grid) return;
+
+        if (habits.length === 0) {
+            grid.innerHTML = `
+                <div class="insight-pill">
+                    <span class="insight-icon" style="color: #6366f1;">info</span>
+                    <div class="insight-content">
+                        <strong>Get Started</strong>
+                        <p>Create your first habit on the dashboard to start tracking analytics and visual trends.</p>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        // Calculate day-of-week stats
+        const dowTotals = [0, 0, 0, 0, 0, 0, 0];
+        const dowDones = [0, 0, 0, 0, 0, 0, 0];
+
+        dateList.forEach(iso => {
+            const d = new Date(iso + 'T00:00:00');
+            const dayIdx = d.getDay();
+            const r = dailyRateMap[iso];
+            if (r) {
+                dowTotals[dayIdx] += r.due;
+                dowDones[dayIdx] += r.done;
+            }
+        });
+
+        let bestDowIdx = 1;
+        let bestDowRate = -1;
+        let worstDowIdx = 0;
+        let worstDowRate = 999;
+
+        for (let i = 0; i < 7; i++) {
+            if (dowTotals[i] > 0) {
+                const rate = Math.round((dowDones[i] * 100) / dowTotals[i]);
+                if (rate > bestDowRate) {
+                    bestDowRate = rate;
+                    bestDowIdx = i;
+                }
+                if (rate < worstDowRate) {
+                    worstDowRate = rate;
+                    worstDowIdx = i;
+                }
+            }
+        }
+
+        const fullDayNames = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+        const peakDayText = bestDowRate >= 0
+            ? `Your peak consistency occurs on <strong>${fullDayNames[bestDowIdx]}</strong> with a <strong>${bestDowRate}%</strong> completion rate.`
+            : 'Track habits over multiple days to reveal your peak performance patterns.';
+
+        // Top habit
+        const topHabit = [...habits].sort((a, b) => (b.completionPercentage || 0) - (a.completionPercentage || 0))[0];
+        const championText = topHabit
+            ? `<strong>${esc(topHabit.name)}</strong> is leading with <strong>${topHabit.completionPercentage || 0}%</strong> consistency and a ${topHabit.currentStreak || 0}-day streak.`
+            : 'Keep ticking habits daily to see your top performing routine.';
+
+        // Actionable optimization tip
+        let tipText = 'Consistency compounds! Even completing a single 2-minute habit daily strengthens habit loops.';
+        if (worstDowRate < 50 && worstDowRate < bestDowRate) {
+            tipText = `Discipline dips slightly on <strong>${fullDayNames[worstDowIdx]}</strong> (${worstDowRate}%). Try setting weekend reminders earlier!`;
+        } else if (overallRate >= 75) {
+            tipText = 'You are performing in the top tier! Consider adding an incremental habit to challenge yourself.';
+        }
+
+        grid.innerHTML = `
+            <div class="insight-pill">
+                <span class="insight-icon" style="color: #10b981;">trending_up</span>
+                <div class="insight-content">
+                    <strong>Peak Discipline Day</strong>
+                    <p>${peakDayText}</p>
+                </div>
+            </div>
+            <div class="insight-pill">
+                <span class="insight-icon" style="color: #f59e0b;">emoji_events</span>
+                <div class="insight-content">
+                    <strong>Discipline Champion</strong>
+                    <p>${championText}</p>
+                </div>
+            </div>
+            <div class="insight-pill">
+                <span class="insight-icon" style="color: #6366f1;">psychology</span>
+                <div class="insight-content">
+                    <strong>Discipline Optimization</strong>
+                    <p>${tipText}</p>
+                </div>
+            </div>`;
+    }
+
+    function renderStatsTrendChart(dateList, dailyRateMap) {
+        const canvas = document.getElementById('statsTrendChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const ctx = canvas.getContext('2d');
+        const labels = dateList.map(iso => {
+            const d = new Date(iso + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        });
+        const dataPoints = dateList.map(iso => (dailyRateMap[iso] ? dailyRateMap[iso].pct : 0));
+
+        // Average badge
+        const activeDays = dateList.filter(iso => dailyRateMap[iso] && dailyRateMap[iso].due > 0);
+        const avg = activeDays.length
+            ? Math.round(activeDays.reduce((sum, iso) => sum + dailyRateMap[iso].pct, 0) / activeDays.length)
+            : 0;
+
+        const avgBadge = document.getElementById('statsTrendAvgBadge');
+        if (avgBadge) {
+            avgBadge.innerText = `${avg}% Avg`;
+            const color = getWeeklyProgressColor(avg);
+            avgBadge.style.backgroundColor = color.bg.replace('0.85', '0.15');
+            avgBadge.style.color = color.border;
+            avgBadge.style.borderColor = color.border;
+        }
+
+        // Gradient for line fill
+        const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
+
+        if (statsTrendChartInstance) {
+            statsTrendChartInstance.destroy();
+            statsTrendChartInstance = null;
+        }
+
+        statsTrendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Completion %',
+                    data: dataPoints,
+                    borderColor: '#10b981',
+                    borderWidth: 2.5,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 1.5,
+                    pointRadius: dateList.length > 20 ? 2 : 4,
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#e2e8f0',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                const idx = context.dataIndex;
+                                const iso = dateList[idx];
+                                const item = dailyRateMap[iso];
+                                const done = item ? item.done : 0;
+                                const due = item ? item.due : 0;
+                                return ` ${context.parsed.y}% (${done}/${due} habits completed)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { family: "'Inter', sans-serif", size: 11 },
+                            maxTicksLimit: 10
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: '#f1f5f9' },
+                        ticks: {
+                            callback: val => `${val}%`,
+                            color: '#94a3b8',
+                            font: { family: "'Inter', sans-serif", size: 11 },
+                            stepSize: 25
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderStatsCategoryChart() {
+        const canvas = document.getElementById('statsCategoryChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const ctx = canvas.getContext('2d');
+        const catMap = {};
+        habits.forEach(h => {
+            const cat = h.category || 'General';
+            catMap[cat] = (catMap[cat] || 0) + (h.completions ? h.completions.length : 1);
+        });
+
+        const categories = Object.keys(catMap);
+        const dataValues = categories.map(c => catMap[c]);
+        const colors = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316', '#14b8a6'];
+
+        const legendContainer = document.getElementById('statsCategoryLegend');
+        if (legendContainer) {
+            legendContainer.innerHTML = categories.map((cat, idx) => `
+                <span class="cat-legend-item">
+                    <span class="cat-legend-dot" style="background: ${colors[idx % colors.length]};"></span>
+                    <strong>${esc(cat)}</strong>: ${catMap[cat]} ticks
+                </span>
+            `).join('') || '<span class="text-muted">No categories available</span>';
+        }
+
+        if (statsCategoryChartInstance) {
+            statsCategoryChartInstance.destroy();
+            statsCategoryChartInstance = null;
+        }
+
+        if (categories.length === 0) return;
+
+        statsCategoryChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: categories,
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: categories.map((_, i) => colors[i % colors.length]),
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.parsed} completions`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderStatsDayOfWeekChart(dateList, dailyRateMap) {
+        const canvas = document.getElementById('statsDayOfWeekChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const ctx = canvas.getContext('2d');
+        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const dueTotals = [0, 0, 0, 0, 0, 0, 0];
+        const doneTotals = [0, 0, 0, 0, 0, 0, 0];
+
+        dateList.forEach(iso => {
+            const d = new Date(iso + 'T00:00:00');
+            const dayNum = d.getDay();
+            const idx = dayNum === 0 ? 6 : dayNum - 1;
+            const r = dailyRateMap[iso];
+            if (r) {
+                dueTotals[idx] += r.due;
+                doneTotals[idx] += r.done;
+            }
+        });
+
+        const dayPcts = dueTotals.map((due, i) => (due > 0 ? Math.round((doneTotals[i] * 100) / due) : 0));
+        const bgColors = dayPcts.map(p => getWeeklyProgressColor(p).bg);
+        const borderColors = dayPcts.map(p => getWeeklyProgressColor(p).border);
+
+        if (statsDayOfWeekChartInstance) {
+            statsDayOfWeekChartInstance.destroy();
+            statsDayOfWeekChartInstance = null;
+        }
+
+        statsDayOfWeekChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dayLabels,
+                datasets: [{
+                    label: 'Discipline %',
+                    data: dayPcts,
+                    backgroundColor: bgColors,
+                    borderColor: borderColors,
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                const idx = context.dataIndex;
+                                return ` ${context.parsed.y}% completed (${doneTotals[idx]}/${dueTotals[idx]} habits)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8', font: { family: "'Inter', sans-serif", size: 11 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: '#f1f5f9' },
+                        ticks: {
+                            callback: val => `${val}%`,
+                            color: '#94a3b8',
+                            font: { family: "'Inter', sans-serif", size: 11 },
+                            stepSize: 25
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderStatsHeatmapMatrix(todayObj) {
+        const container = document.getElementById('statsHeatmapGrid');
+        if (!container) return;
+
+        const currentMonday = getMonday(todayObj);
+        const startMonday = new Date(currentMonday);
+        startMonday.setDate(startMonday.getDate() - 28);
+
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const rows = days.map((dayName, dayIndex) => {
+            let cellsHtml = '';
+            for (let week = 0; week < 5; week++) {
+                const cellDate = new Date(startMonday);
+                cellDate.setDate(cellDate.getDate() + (week * 7) + dayIndex);
+                const iso = formatDateIso(cellDate);
+
+                if (cellDate > todayObj) {
+                    cellsHtml += `<div class="heatmap-cell lvl-0" title="${iso} (Future day)" style="opacity: 0.35;"></div>`;
+                    continue;
+                }
+
+                const dueHabits = habits.filter(h => !isWeekly(h) && h.start <= iso);
+                const doneHabits = dueHabits.filter(h => h.completionsSet.has(iso));
+                const total = dueHabits.length;
+                const done = doneHabits.length;
+                const pct = total > 0 ? Math.round((done * 100) / total) : 0;
+
+                let lvl = 'lvl-0';
+                if (pct >= 85) lvl = 'lvl-4';
+                else if (pct >= 60) lvl = 'lvl-3';
+                else if (pct >= 35) lvl = 'lvl-2';
+                else if (pct > 0) lvl = 'lvl-1';
+
+                const tip = `${formatShortDate(cellDate)}: ${done}/${total} habits completed (${pct}%)`;
+                cellsHtml += `<div class="heatmap-cell ${lvl}" title="${tip}"></div>`;
+            }
+
+            return `
+                <div class="heatmap-row">
+                    <span class="heatmap-label">${dayName}</span>
+                    <div class="heatmap-cells">${cellsHtml}</div>
+                </div>`;
+        }).join('');
+
+        container.innerHTML = rows || '<p class="text-muted">No activity data available.</p>';
+    }
+
+    function renderLeaderboardTable() {
+        const tbody = document.getElementById('statsLeaderboardBody');
+        if (!tbody) return;
+
+        if (habits.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 25px; color: var(--text-muted);">No habits recorded yet. Add habits to view consistency matrix.</td></tr>';
+            return;
+        }
+
+        const sorted = [...habits].sort((a, b) => {
+            const pctA = a.completionPercentage || 0;
+            const pctB = b.completionPercentage || 0;
+            if (pctB !== pctA) return pctB - pctA;
+            return (b.currentStreak || 0) - (a.currentStreak || 0);
+        });
+
+        tbody.innerHTML = sorted.map(h => {
+            const pct = h.completionPercentage || 0;
+            const streak = h.currentStreak || 0;
+            const best = h.bestStreak || 0;
+            const checkIns = h.completions ? h.completions.length : 0;
+
+            let badgeHtml = '';
+            if (pct >= 80) {
+                badgeHtml = '<span class="discipline-badge badge-fire">🔥 On Fire</span>';
+            } else if (pct >= 55) {
+                badgeHtml = '<span class="discipline-badge badge-steady">⚡ Steady</span>';
+            } else if (pct >= 30) {
+                badgeHtml = '<span class="discipline-badge badge-emerging">🌱 Emerging</span>';
+            } else {
+                badgeHtml = '<span class="discipline-badge badge-focus">⚠️ Needs Focus</span>';
+            }
+
+            const tierColor = getWeeklyProgressColor(pct).border;
+
+            return `
+                <tr class="stats-habit-row" data-habit-name="${esc(h.name).toLowerCase()}" data-category="${esc(h.category || '').toLowerCase()}">
+                    <td><strong>${esc(h.name)}</strong></td>
+                    <td><span class="cat-legend-item" style="padding: 2px 8px; font-size: 11.5px;">${esc(h.category || 'General')}</span></td>
+                    <td>${isWeekly(h) ? 'Weekly' : 'Daily'}</td>
+                    <td><span style="font-weight: 600; color: #ea580c;">${streak} day${streak === 1 ? '' : 's'}</span></td>
+                    <td><span style="font-weight: 600; color: #ca8a04;">${best} day${best === 1 ? '' : 's'}</span></td>
+                    <td><strong>${checkIns}</strong></td>
+                    <td>
+                        <div class="progress-bar-wrap">
+                            <div class="mini-progress-track">
+                                <div class="mini-progress-fill" style="width: ${pct}%; background: ${tierColor};"></div>
+                            </div>
+                            <span class="progress-pct-num">${pct}%</span>
+                        </div>
+                    </td>
+                    <td>${badgeHtml}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    function filterLeaderboardTable(query) {
+        const rows = document.querySelectorAll('.stats-habit-row');
+        rows.forEach(row => {
+            const name = row.getAttribute('data-habit-name') || '';
+            const cat = row.getAttribute('data-category') || '';
+            if (!query || name.includes(query) || cat.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // ==========================================
+    // STATS CALCULATION LOGIC
+    // ==========================================
+    function recalculateHabitStats(habit) {
+        const weekly = isWeekly(habit);
+        const step = weekly ? 7 : 1;
+        const now = periodOf(new Date(), weekly);
+        const first = periodOf(new Date(habit.startDate || new Date()), weekly);
+        
+        const doneSet = new Set();
+        (habit.completions || []).forEach(dStr => {
+            const d = new Date(dStr);
+            if (isNaN(d.getTime())) return;
+            const p = periodOf(d, weekly);
+            if (p >= first && p <= now) {
+                doneSet.add(p.getTime());
+            }
+        });
+        
+        const done = Array.from(doneSet).sort((a, b) => a - b);
+        
+        let best = 0;
+        let run = 0;
+        let previous = null;
+        
+        done.forEach(time => {
+            const period = new Date(time);
+            if (previous !== null) {
+                const diffTime = period.getTime() - previous.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+                if (diffDays === step) {
+                    run += 1;
+                } else {
+                    run = 1;
+                }
+            } else {
+                run = 1;
+            }
+            if (run > best) best = run;
+            previous = period;
+        });
+        
+        let current = 0;
+        if (done.length > 0) {
+            const lastTime = done[done.length - 1];
+            const diffTime = now.getTime() - lastTime;
+            const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+            if (diffDays === 0 || diffDays === step) {
+                current = run;
+            }
+        }
+        
+        let totalPeriods = Math.floor(Math.round((now.getTime() - first.getTime()) / (1000 * 3600 * 24)) / step) + 1;
+        if (totalPeriods < 1) totalPeriods = 1;
+        let pct = Math.round((done.length * 100) / totalPeriods);
+        if (pct > 100) pct = 100;
+        
+        habit.currentStreak = current;
+        habit.bestStreak = best;
+        habit.completionPercentage = pct;
+    }
+
+    function periodOf(date, weekly) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        if (weekly) {
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+        }
+        return d;
+    }
+
+    // ==========================================
+    // CALENDAR LOGIC
+    // ==========================================
+    let currentCalDate = new Date();
+    let selectedCalDate = new Date();
+
+    function initCalendar() {
+        renderCalendar();
+        renderDayHabits(selectedCalDate);
+
+        const calPrevMonth = document.getElementById('calPrevMonth');
+        const calNextMonth = document.getElementById('calNextMonth');
+
+        if (calPrevMonth && !calPrevMonth.dataset.bound) {
+            calPrevMonth.addEventListener('click', () => {
+                currentCalDate.setMonth(currentCalDate.getMonth() - 1);
+                renderCalendar();
+            });
+            calPrevMonth.dataset.bound = 'true';
+        }
+
+        if (calNextMonth && !calNextMonth.dataset.bound) {
+            calNextMonth.addEventListener('click', () => {
+                currentCalDate.setMonth(currentCalDate.getMonth() + 1);
+                renderCalendar();
+            });
+            calNextMonth.dataset.bound = 'true';
+        }
+    }
+
+    function renderCalendar() {
+        const calMonthYear = document.getElementById('calMonthYear');
+        const calendarGrid = document.querySelector('.calendar-grid');
+        if (!calMonthYear || !calendarGrid) return;
+
+        const year = currentCalDate.getFullYear();
+        const month = currentCalDate.getMonth();
+        
+        calMonthYear.innerText = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        // Remove old days
+        const oldDays = calendarGrid.querySelectorAll('.cal-day');
+        oldDays.forEach(d => d.remove());
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const prevMonthDays = new Date(year, month, 0).getDate();
+
+        // Previous month days
+        for (let i = firstDay; i > 0; i--) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'cal-day other-month';
+            dayDiv.innerText = prevMonthDays - i + 1;
+            calendarGrid.appendChild(dayDiv);
+        }
+
+        // Current month days
+        const today = new Date();
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'cal-day';
+            dayDiv.innerText = i;
+            
+            const cellDate = new Date(year, month, i);
+            
+            if (cellDate.toDateString() === today.toDateString()) {
+                dayDiv.classList.add('today');
+            }
+            
+            if (cellDate.toDateString() === selectedCalDate.toDateString()) {
+                dayDiv.classList.add('active');
+            }
+
+            dayDiv.addEventListener('click', () => {
+                selectedCalDate = cellDate;
+                renderCalendar();
+                renderDayHabits(selectedCalDate);
+            });
+
+            calendarGrid.appendChild(dayDiv);
+        }
+
+        // Next month days
+        const totalCells = firstDay + daysInMonth;
+        const remainingCells = 42 - totalCells; // 6 rows max
+        for (let i = 1; i <= remainingCells; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'cal-day other-month';
+            dayDiv.innerText = i;
+            calendarGrid.appendChild(dayDiv);
+        }
+    }
+
+    function renderDayHabits(date) {
+        const listDiv = document.getElementById('calDayHabitsList');
+        const selectedDateText = document.getElementById('calSelectedDateText');
+        if (!listDiv || !selectedDateText) return;
+
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        const isoDate = formatDateIso(date);
+        selectedDateText.innerText = 'Habits for ' + dateStr;
+
+        // Filter habits that started before or on this date
+        const activeHabits = habits.filter(h => {
+            const startDate = h.startDate || '2000-01-01';
+            return startDate <= isoDate;
+        });
+
+        if (activeHabits.length === 0) {
+            listDiv.innerHTML = '<p class="text-muted">No habits active on this day.</p>';
+            return;
+        }
+
+        let html = '';
+        activeHabits.forEach(h => {
+            const isCompleted = h.completions && h.completions.includes(isoDate);
+            
+            // For weekly habits, maybe they completed it on another day of the week, but for this specific date view we just check if the isoDate is in completions
+            html += `
+                <div class="cal-habit-item">
+                    <span class="cal-habit-name">${esc(h.name)} <small class="text-muted">(${esc(h.category)})</small></span>
+                    <span class="cal-habit-status ${isCompleted ? 'completed' : 'missed'}">
+                        <span class="icon">${isCompleted ? 'check_circle' : 'cancel'}</span>
+                    </span>
+                </div>
+            `;
+        });
+        
+        listDiv.innerHTML = html;
+    }
+
 
     // Utils
     // Habit names and categories are user input, so escape them before they go into innerHTML.
