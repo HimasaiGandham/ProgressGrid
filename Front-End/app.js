@@ -587,7 +587,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchHabits() {
         const res = await api('');
         const serverHabits = res && res.ok ? await res.json().catch(() => null) : null;
-        if (Array.isArray(serverHabits)) {
+        const loadedFromServer = Array.isArray(serverHabits);
+        if (loadedFromServer) {
             habits = serverHabits;
             saveStoredHabits(habits);
         } else {
