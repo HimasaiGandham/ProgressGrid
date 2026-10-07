@@ -133,7 +133,7 @@ public class HabitService {
             for (int i = 0; i < 30; i++) {
                 LocalDate d = today.minusDays(i);
                 List<HabitDTO> activeOnDay = dailyHabits.stream()
-                        .filter(h -> !d.isBefore(h.getStartDate()))
+                        .filter(h -> h.getStartDate() != null && !d.isBefore(h.getStartDate()))
                         .collect(Collectors.toList());
                 if (!activeOnDay.isEmpty()) {
                     boolean allDone = activeOnDay.stream()
