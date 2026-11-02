@@ -1109,137 +1109,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '100% completion days';
         }
 
-        // 2. Render Smart Insights
-        renderSmartInsights(dateList, dailyRateMap, habits, overallConsistency, currInfo, perfectStreak);
-
-        // 3. Render Consistency Trajectory Chart
+        // 2. Render Consistency Trajectory Chart
         renderStatsTrendChart(dateList, dailyRateMap);
 
-        // 4. Render Category Donut Chart
+        // 3. Render Category Donut Chart
         renderStatsCategoryChart();
 
-        // 5. Render Day of Week Discipline Chart
+        // 4. Render Day of Week Discipline Chart
         renderStatsDayOfWeekChart(dateList, dailyRateMap);
 
-        // 6. Render Heatmap Matrix
+        // 5. Render Heatmap Matrix
         renderStatsHeatmapMatrix(todayObj);
 
-        // 7. Render Leaderboard Table
+        // 6. Render Leaderboard Table
         renderLeaderboardTable();
-    }
-
-    function renderSmartInsights(dateList, dailyRateMap, habits, overallRate, currInfo, perfectStreak = 0) {
-        const grid = document.getElementById('statsInsightsGrid');
-        if (!grid) return;
-
-        if (habits.length === 0) {
-            grid.innerHTML = `
-                <div class="insight-pill">
-                    <span class="insight-icon" style="color: #6366f1;">info</span>
-                    <div class="insight-content">
-                        <strong>Get Started</strong>
-                        <p>Create your first habit on the dashboard to start tracking analytics and visual trends.</p>
-                    </div>
-                </div>`;
-            return;
-        }
-
-        // Calculate day-of-week stats
-        const dowTotals = [0, 0, 0, 0, 0, 0, 0];
-        const dowDones = [0, 0, 0, 0, 0, 0, 0];
-
-        dateList.forEach(iso => {
-            const d = new Date(iso + 'T00:00:00');
-            const dayIdx = d.getDay();
-            const r = dailyRateMap[iso];
-            if (r) {
-                dowTotals[dayIdx] += r.due;
-                dowDones[dayIdx] += r.done;
-            }
-        });
-
-        let bestDowIdx = 1;
-        let bestDowRate = -1;
-        let worstDowIdx = 0;
-        let worstDowRate = 999;
-
-        for (let i = 0; i < 7; i++) {
-            if (dowTotals[i] > 0) {
-                const rate = Math.round((dowDones[i] * 100) / dowTotals[i]);
-                if (rate > bestDowRate) {
-                    bestDowRate = rate;
-                    bestDowIdx = i;
-                }
-                if (rate < worstDowRate) {
-                    worstDowRate = rate;
-                    worstDowIdx = i;
-                }
-            }
-        }
-
-        const fullDayNames = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
-        const peakDayText = bestDowRate >= 0
-            ? `Your peak consistency occurs on <strong>${fullDayNames[bestDowIdx]}</strong> with a <strong>${bestDowRate}%</strong> completion rate.`
-            : 'Track habits over multiple days to reveal your peak performance patterns.';
-
-        // Top habit or tied champions
-        let championText = '';
-        const maxPct = habits.length > 0 ? Math.max(...habits.map(h => h.completionPercentage || 0)) : 0;
-        const champions = habits.filter(h => (h.completionPercentage || 0) === maxPct && maxPct > 0);
-        if (champions.length === habits.length && habits.length > 1) {
-            championText = `Outstanding discipline! <strong>All ${habits.length} habits</strong> are tied at <strong>${maxPct}%</strong> consistency (${currInfo.text} streak).`;
-        } else if (champions.length > 1) {
-            championText = `<strong>${champions.map(h => esc(h.name)).join(' and ')}</strong> share top honors tied at <strong>${maxPct}%</strong> consistency.`;
-        } else if (champions.length === 1) {
-            const h = champions[0];
-            championText = `<strong>${esc(h.name)}</strong> is leading with <strong>${h.completionPercentage || 0}%</strong> consistency and a ${streakText(h, h.currentStreak || 0)} streak.`;
-        } else {
-            championText = 'Keep ticking habits daily to see your top performing routine.';
-        }
-
-        // Actionable optimization tip
-        let tipText = 'Consistency compounds! Even completing a single 2-minute habit daily strengthens habit loops.';
-        if (worstDowRate < 50 && worstDowRate < bestDowRate) {
-            tipText = `Discipline dips slightly on <strong>${fullDayNames[worstDowIdx]}</strong> (${worstDowRate}%). Try setting weekend reminders earlier!`;
-        } else if (overallRate >= 75) {
-            tipText = 'You are performing in the top tier! Consider adding an incremental habit to challenge yourself.';
-        }
-
-        let perfectRunPill = '';
-        if (perfectStreak > 0) {
-            perfectRunPill = `
-                <div class="insight-pill" style="border-left: 3px solid #10b981;">
-                    <span class="insight-icon" style="color: #10b981;">verified</span>
-                    <div class="insight-content">
-                        <strong>All-Habits Streak Active</strong>
-                        <p>You completed 100% of all scheduled habits for <strong>${perfectStreak} consecutive day${perfectStreak === 1 ? '' : 's'}</strong>! Flawless consistency.</p>
-                    </div>
-                </div>`;
-        }
-
-        grid.innerHTML = `
-            ${perfectRunPill}
-            <div class="insight-pill">
-                <span class="insight-icon" style="color: #10b981;">trending_up</span>
-                <div class="insight-content">
-                    <strong>Peak Discipline Day</strong>
-                    <p>${peakDayText}</p>
-                </div>
-            </div>
-            <div class="insight-pill">
-                <span class="insight-icon" style="color: #f59e0b;">emoji_events</span>
-                <div class="insight-content">
-                    <strong>Discipline Champion</strong>
-                    <p>${championText}</p>
-                </div>
-            </div>
-            <div class="insight-pill">
-                <span class="insight-icon" style="color: #6366f1;">psychology</span>
-                <div class="insight-content">
-                    <strong>Discipline Optimization</strong>
-                    <p>${tipText}</p>
-                </div>
-            </div>`;
     }
 
     function renderStatsTrendChart(dateList, dailyRateMap) {
