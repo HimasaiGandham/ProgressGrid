@@ -699,14 +699,55 @@ document.addEventListener('DOMContentLoaded', () => {
         </span>`;
     }
 
-    // Calculate consecutive days where all daily habits due were 100% completed
-    function calculatePerfectStreak(habitsList) {
-        const dailyHabits = (habitsList || []).filter(h => !isWeekly(h));
-        if (dailyHabits.length === 0) return 0;
+    // Format badge markup for overall streaks (all habits completed in the day)
+    function formatOverallStreakSubtext(streakData, type = 'current') {
+        if (!streakData || streakData.todayTotalCount === 0) {
+            return `<span class="kpi-subtext-plain">${type === 'current' ? 'No active streak' : 'Personal record'}</span>`;
+        }
 
-        const today = new Date();
-        const todayIso = formatDateIso(today);
-        let streak = 0;
+        if (type === 'current') {
+            if (streakData.todayAllDone) {
+                return `<span class="subtext-badge subtext-pill-fire" title="All habits completed today">
+                    <span class="icon subtext-icon">local_fire_department</span>
+                    <span class="subtext-name">All ${streakData.todayTotalCount} habits done today</span>
+                </span>`;
+            }
+            if (streakData.currentStreak > 0) {
+                return `<span class="subtext-badge subtext-pill-emerald" title="${streakData.todayDoneCount}/${streakData.todayTotalCount} completed today">
+                    <span class="icon subtext-icon">verified</span>
+                    <span class="subtext-name">${streakData.todayDoneCount}/${streakData.todayTotalCount} done today (${streakData.currentStreak}d streak)</span>
+                </span>`;
+            }
+            if (streakData.todayDoneCount > 0) {
+                return `<span class="kpi-subtext-plain">${streakData.todayDoneCount} of ${streakData.todayTotalCount} completed today</span>`;
+            }
+            return `<span class="kpi-subtext-plain">Complete all habits to start streak</span>`;
+        } else {
+            if (streakData.bestStreak > 0) {
+                return `<span class="subtext-badge subtext-pill-trophy" title="Personal best streak">
+                    <span class="icon subtext-icon">emoji_events</span>
+                    <span class="subtext-name">Personal record</span>
+                </span>`;
+            }
+            return `<span class="kpi-subtext-plain">Personal record</span>`;
+        }
+    }
+
+    // Calculate overall streak: streak ONLY increases if ALL active daily habits due on that day are 100% completed
+    function calculateOverallStreaks(habitsList) {
+        const dailyHabits = (habitsList || []).filter(h => !isWeekly(h));
+        if (dailyHabits.length === 0) {
+            return {
+                currentStreak: 0,
+                bestStreak: 0,
+                todayAllDone: false,
+                todayDoneCount: 0,
+                todayTotalCount: 0
+            };
+        }
+
+        const todayObj = new Date();
+        const todayIso = formatDateIso(todayObj);
 
         const isHabitDoneOn = (h, iso) => {
             return (h.completionsSet && h.completionsSet.has(iso)) ||
@@ -714,28 +755,82 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const todayActive = dailyHabits.filter(h => getHabitStartDate(h) <= todayIso);
-        const todayAllDone = todayActive.length > 0 && todayActive.every(h => isHabitDoneOn(h, todayIso));
+        const todayDoneCount = todayActive.filter(h => isHabitDoneOn(h, todayIso)).length;
+        const todayAllDone = todayActive.length > 0 && todayDoneCount === todayActive.length;
 
-        let iter = new Date(today);
-        if (!todayAllDone) {
-            // A run ending yesterday still counts as the active streak
+        // Current streak: only counts days where ALL active daily habits were completed
+        let currentStreak = 0;
+        let iter = new Date(todayObj);
+
+        if (todayAllDone) {
+            // Today is 100% completed: streak is active and includes today
+            while (true) {
+                const iso = formatDateIso(iter);
+                const activeOnDay = dailyHabits.filter(h => getHabitStartDate(h) <= iso);
+                if (activeOnDay.length === 0) break;
+
+                const allDone = activeOnDay.every(h => isHabitDoneOn(h, iso));
+                if (allDone) {
+                    currentStreak++;
+                    iter.setDate(iter.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+        } else {
+            // Today is NOT yet fully completed: streak does NOT increase for today.
+            // Check yesterday: if yesterday was 100% completed, yesterday's streak holds (pending today).
             iter.setDate(iter.getDate() - 1);
-        }
+            while (true) {
+                const iso = formatDateIso(iter);
+                const activeOnDay = dailyHabits.filter(h => getHabitStartDate(h) <= iso);
+                if (activeOnDay.length === 0) break;
 
-        while (true) {
-            const iso = formatDateIso(iter);
-            const activeOnDay = dailyHabits.filter(h => getHabitStartDate(h) <= iso);
-            if (activeOnDay.length === 0) break;
-
-            const allDone = activeOnDay.every(h => isHabitDoneOn(h, iso));
-            if (allDone) {
-                streak++;
-                iter.setDate(iter.getDate() - 1);
-            } else {
-                break;
+                const allDone = activeOnDay.every(h => isHabitDoneOn(h, iso));
+                if (allDone) {
+                    currentStreak++;
+                    iter.setDate(iter.getDate() - 1);
+                } else {
+                    break;
+                }
             }
         }
-        return streak;
+
+        // Best streak: the maximum consecutive days where ALL habits were 100% completed
+        let earliestDate = todayIso;
+        dailyHabits.forEach(h => {
+            const s = getHabitStartDate(h);
+            if (s && s < earliestDate) earliestDate = s;
+        });
+
+        let bestStreak = 0;
+        let run = 0;
+        let scan = new Date(earliestDate + 'T00:00:00');
+        while (formatDateIso(scan) <= todayIso) {
+            const iso = formatDateIso(scan);
+            const activeOnDay = dailyHabits.filter(h => getHabitStartDate(h) <= iso);
+            if (activeOnDay.length > 0 && activeOnDay.every(h => isHabitDoneOn(h, iso))) {
+                run++;
+                if (run > bestStreak) bestStreak = run;
+            } else {
+                run = 0;
+            }
+            scan.setDate(scan.getDate() + 1);
+        }
+        bestStreak = Math.max(bestStreak, currentStreak);
+
+        return {
+            currentStreak,
+            bestStreak,
+            todayAllDone,
+            todayDoneCount,
+            todayTotalCount: todayActive.length
+        };
+    }
+
+    // Backwards-compatible alias for calculatePerfectStreak
+    function calculatePerfectStreak(habitsList) {
+        return calculateOverallStreaks(habitsList).currentStreak;
     }
 
     function renderSummaries() {
@@ -748,19 +843,20 @@ document.addEventListener('DOMContentLoaded', () => {
             sumTotalSub.innerText = habits.length === 1 ? '1 active routine' : `${habits.length} active routines`;
         }
 
-        const currInfo = streakLeaderInfo('currentStreak');
-        const bestInfo = streakLeaderInfo('bestStreak');
+        const streakData = calculateOverallStreaks(habits);
+        const currStreak = streakData.currentStreak;
+        const bestStreak = streakData.bestStreak;
 
-        document.getElementById('sumCurrentStreak').innerText = currInfo.text;
-        document.getElementById('sumBestStreak').innerText = bestInfo.text;
+        document.getElementById('sumCurrentStreak').innerText = `${currStreak} day${currStreak === 1 ? '' : 's'}`;
+        document.getElementById('sumBestStreak').innerText = `${bestStreak} day${bestStreak === 1 ? '' : 's'}`;
 
         const sumCurrSub = document.getElementById('sumCurrentStreakSub');
         if (sumCurrSub) {
-            sumCurrSub.innerHTML = formatStreakSubtext(currInfo.maxVal, currInfo.ties, habits.length, 'current');
+            sumCurrSub.innerHTML = formatOverallStreakSubtext(streakData, 'current');
         }
         const sumBestSub = document.getElementById('sumBestStreakSub');
         if (sumBestSub) {
-            sumBestSub.innerHTML = formatStreakSubtext(bestInfo.maxVal, bestInfo.ties, habits.length, 'best');
+            sumBestSub.innerHTML = formatOverallStreakSubtext(streakData, 'best');
         }
 
         // This week so far: a daily habit can be done once for each day since it started,
@@ -1082,18 +1178,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const streakData = calculateOverallStreaks(habits);
         const currStreakEl = document.getElementById('statsCurrentStreak');
-        if (currStreakEl) currStreakEl.innerText = currInfo.text;
+        if (currStreakEl) currStreakEl.innerText = `${streakData.currentStreak} day${streakData.currentStreak === 1 ? '' : 's'}`;
         const currStreakHabitEl = document.getElementById('statsCurrentStreakHabit');
         if (currStreakHabitEl) {
-            currStreakHabitEl.innerHTML = formatStreakSubtext(currInfo.maxVal, currInfo.ties, habits.length, 'current');
+            currStreakHabitEl.innerHTML = formatOverallStreakSubtext(streakData, 'current');
         }
 
         const bestStreakEl = document.getElementById('statsBestStreak');
-        if (bestStreakEl) bestStreakEl.innerText = bestInfo.text;
+        if (bestStreakEl) bestStreakEl.innerText = `${streakData.bestStreak} day${streakData.bestStreak === 1 ? '' : 's'}`;
         const bestStreakHabitEl = document.getElementById('statsBestStreakHabit');
         if (bestStreakHabitEl) {
-            bestStreakHabitEl.innerHTML = formatStreakSubtext(bestInfo.maxVal, bestInfo.ties, habits.length, 'best');
+            bestStreakHabitEl.innerHTML = formatOverallStreakSubtext(streakData, 'best');
         }
 
         const totalTicksEl = document.getElementById('statsTotalCompletions');
