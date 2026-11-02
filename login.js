@@ -42,7 +42,7 @@ async function readError(res, fallback) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Arriving from the logout button: drop the session but preserve user habits and demo accounts.
+    // Arriving from the logout button: drop the session and demo habit residue.
     if (new URLSearchParams(window.location.search).get('logout') === 'true') {
         localStorage.removeItem('progressgrid_token');
         localStorage.removeItem('username');
@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('userFullName');
         localStorage.removeItem('userEmail');
         localStorage.removeItem('userMobile');
+        localStorage.removeItem('pg_demo_habits');
     }
 
     const loginForm = document.getElementById('loginForm');
@@ -498,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('email', userEmail);
                     localStorage.setItem('userEmail', userEmail);
                 }
+                localStorage.removeItem('pg_demo_habits');
                 window.location.href = 'index.html';
             } else if (res.status === 405 || res.status === 404) {
                 // Static host returned 405 Method Not Allowed / 404
@@ -526,12 +528,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
         } else {
-            // First time signing in with this account: save it to browser storage
+            // First time signing in with this account: save it to browser storage with empty habits
             const email = identifier.includes('@') ? identifier : '';
             const uname = identifier.includes('@') ? identifier.split('@')[0] : identifier;
             saveDemoUser(uname, email, inputPassword);
+            const userKey = (uname || email || key).trim().toLowerCase();
+            if (userKey) {
+                localStorage.setItem(`pg_habits_${userKey}`, JSON.stringify([]));
+            }
         }
 
+        localStorage.removeItem('pg_demo_habits');
         localStorage.setItem('progressgrid_token', 'demo-token-' + Date.now());
         localStorage.setItem('username', existing ? existing.username : (identifier.includes('@') ? identifier.split('@')[0] : identifier));
         localStorage.setItem('email', existing && existing.email ? existing.email : (identifier.includes('@') ? identifier : ''));
@@ -586,6 +593,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDemoSignup(username, email, password) {
         saveDemoUser(username, email, password);
+        const userKey = (username || email || '').trim().toLowerCase();
+        if (userKey) {
+            localStorage.setItem(`pg_habits_${userKey}`, JSON.stringify([]));
+        }
+        localStorage.removeItem('pg_demo_habits');
         signupError.innerText = 'Registration successful! Please sign in.';
         signupError.style.color = '#10b981';
         setTimeout(() => {
