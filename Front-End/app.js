@@ -73,61 +73,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Local storage helpers for static hosting & client-side demo mode
-    function getDefaultHabits() {
-        const today = formatDateIso(new Date());
-        const d1 = formatDateIso(new Date(Date.now() - 86400000));
-        const d2 = formatDateIso(new Date(Date.now() - 86400000 * 2));
-        const d3 = formatDateIso(new Date(Date.now() - 86400000 * 3));
-        const defaultList = [
-            {
-                id: 101,
-                name: 'Morning Workout & Stretch',
-                category: 'Health',
-                frequency: 'DAILY',
-                startDate: d3,
-                completions: [today, d1, d2]
-            },
-            {
-                id: 102,
-                name: 'Read 20 Pages',
-                category: 'Productivity',
-                frequency: 'DAILY',
-                startDate: d3,
-                completions: [today, d1, d2, d3]
-            },
-            {
-                id: 103,
-                name: 'Drink 2.5L Water',
-                category: 'Health',
-                frequency: 'DAILY',
-                startDate: d2,
-                completions: [today, d1]
-            },
-            {
-                id: 104,
-                name: 'Weekly Planning & Review',
-                category: 'Work',
-                frequency: 'WEEKLY',
-                startDate: d3,
-                completions: [today]
-            }
-        ];
-        defaultList.forEach(recalculateHabitStats);
-        return defaultList;
+    function getHabitsStorageKey() {
+        const user = (localStorage.getItem('username') || localStorage.getItem('email') || '').trim().toLowerCase();
+        return user ? `pg_habits_${user}` : 'pg_habits_guest';
     }
 
     function getStoredHabits() {
-        const raw = localStorage.getItem('pg_demo_habits');
-        if (raw) {
-            try { return JSON.parse(raw); } catch(e) {}
+        // Clean up legacy shared demo key if present
+        if (localStorage.getItem('pg_demo_habits')) {
+            localStorage.removeItem('pg_demo_habits');
         }
-        const defaults = getDefaultHabits();
-        saveStoredHabits(defaults);
-        return defaults;
+        const key = getHabitsStorageKey();
+        const raw = localStorage.getItem(key);
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    // Filter out any legacy dummy habits (IDs 101-104) if previously persisted
+                    return parsed.filter(h => ![101, 102, 103, 104].includes(h.id));
+                }
+            } catch(e) {}
+        }
+        return [];
     }
 
     function saveStoredHabits(list) {
-        localStorage.setItem('pg_demo_habits', JSON.stringify(list));
+        const key = getHabitsStorageKey();
+        localStorage.setItem(key, JSON.stringify(list || []));
     }
 
     // False on GitHub Pages and for offline demo sign-ins: those only use localStorage.
@@ -556,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update in stored list for client-side demo resilience
             const currentList = getStoredHabits();
-            const storedIndex = currentList.findIndex(h => h.id === habit.id);
+            const storedIndex = currentList.findIndex(h => String(h.id) === String(habit.id));
             if (storedIndex !== -1) {
                 currentList[storedIndex].completions = habit.completions;
                 recalculateHabitStats(currentList[storedIndex]);
@@ -570,6 +542,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             renderDashboard();
+            if (statsView && statsView.style.display !== 'none') {
+                renderStatsView(currentStatsTimeframe);
+            }
             await api(`/${habit.id}/complete`, { method: 'POST', body: JSON.stringify({ date, completed }) });
         });
 
@@ -598,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         habits.forEach(h => {
             h.completionsSet = new Set(h.completions || []);
-            h.start = String(h.startDate || formatDateIso(new Date())).split('T')[0];
+            h.start = getHabitStartDate(h);
             recalculateHabitStats(h);
         });
         if (!loadedFromServer) {
@@ -665,31 +640,148 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    // Helper to resolve start date as ISO string (YYYY-MM-DD)
+    function getHabitStartDate(habit) {
+        if (!habit) return formatDateIso(new Date());
+        const raw = habit.startDate || habit.start;
+        if (!raw) return formatDateIso(new Date());
+        if (raw instanceof Date) return formatDateIso(raw);
+        return String(raw).split('T')[0];
+    }
+
+    // Determine the highest streak and all habits that share that record
+    function streakLeaderInfo(field) {
+        let maxVal = 0;
+        habits.forEach(h => {
+            const v = h[field] || 0;
+            if (v > maxVal) maxVal = v;
+        });
+        if (maxVal === 0 || habits.length === 0) {
+            return { text: '0 days', subtext: 'No active streak', ties: [], maxVal: 0 };
+        }
+        const ties = habits.filter(h => (h[field] || 0) === maxVal);
+        let subtext = '';
+        if (ties.length === habits.length) {
+            subtext = habits.length === 1 ? esc(ties[0].name) : `All ${habits.length} habits active`;
+        } else if (ties.length > 1) {
+            subtext = `${ties.map(h => esc(h.name)).join(' & ')} (Tied)`;
+        } else {
+            subtext = esc(ties[0].name);
+        }
+        return {
+            text: streakText(ties[0], maxVal),
+            subtext: subtext,
+            ties: ties,
+            maxVal: maxVal
+        };
+    }
+
+    // Format badge markup for streak subtexts without raw emojis
+    function formatStreakSubtext(streakVal, tiedList, totalHabits, type = 'current') {
+        if (streakVal <= 0 || !tiedList || tiedList.length === 0) {
+            return `<span class="kpi-subtext-plain">${type === 'current' ? 'No active streak' : 'Personal record'}</span>`;
+        }
+        const iconName = type === 'current' ? 'local_fire_department' : 'emoji_events';
+        const badgeClass = type === 'current' ? 'subtext-pill-fire' : 'subtext-pill-trophy';
+
+        let label = '';
+        if (tiedList.length === totalHabits && totalHabits > 1) {
+            label = `All ${totalHabits} habits active`;
+        } else if (tiedList.length > 1) {
+            label = `${tiedList.map(h => esc(h.name)).join(' & ')} (Tied)`;
+        } else {
+            label = esc(tiedList[0].name);
+        }
+
+        return `<span class="subtext-badge ${badgeClass}" title="${label}">
+            <span class="icon subtext-icon">${iconName}</span>
+            <span class="subtext-name">${label}</span>
+        </span>`;
+    }
+
+    // Calculate consecutive days where all daily habits due were 100% completed
+    function calculatePerfectStreak(habitsList) {
+        const dailyHabits = (habitsList || []).filter(h => !isWeekly(h));
+        if (dailyHabits.length === 0) return 0;
+
+        const today = new Date();
+        const todayIso = formatDateIso(today);
+        let streak = 0;
+
+        const isHabitDoneOn = (h, iso) => {
+            return (h.completionsSet && h.completionsSet.has(iso)) ||
+                   (h.completions && h.completions.includes(iso));
+        };
+
+        const todayActive = dailyHabits.filter(h => getHabitStartDate(h) <= todayIso);
+        const todayAllDone = todayActive.length > 0 && todayActive.every(h => isHabitDoneOn(h, todayIso));
+
+        let iter = new Date(today);
+        if (!todayAllDone) {
+            // A run ending yesterday still counts as the active streak
+            iter.setDate(iter.getDate() - 1);
+        }
+
+        while (true) {
+            const iso = formatDateIso(iter);
+            const activeOnDay = dailyHabits.filter(h => getHabitStartDate(h) <= iso);
+            if (activeOnDay.length === 0) break;
+
+            const allDone = activeOnDay.every(h => isHabitDoneOn(h, iso));
+            if (allDone) {
+                streak++;
+                iter.setDate(iter.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }
+
     function renderSummaries() {
         const days = weekDates(currentWeekStart);
         const today = formatDateIso(new Date());
 
         document.getElementById('sumTotalHabits').innerText = habits.length;
-        document.getElementById('sumCurrentStreak').innerText = longestStreak('currentStreak');
-        document.getElementById('sumBestStreak').innerText = longestStreak('bestStreak');
+        const sumTotalSub = document.getElementById('sumTotalHabitsSub');
+        if (sumTotalSub) {
+            sumTotalSub.innerText = habits.length === 1 ? '1 active routine' : `${habits.length} active routines`;
+        }
+
+        const currInfo = streakLeaderInfo('currentStreak');
+        const bestInfo = streakLeaderInfo('bestStreak');
+
+        document.getElementById('sumCurrentStreak').innerText = currInfo.text;
+        document.getElementById('sumBestStreak').innerText = bestInfo.text;
+
+        const sumCurrSub = document.getElementById('sumCurrentStreakSub');
+        if (sumCurrSub) {
+            sumCurrSub.innerHTML = formatStreakSubtext(currInfo.maxVal, currInfo.ties, habits.length, 'current');
+        }
+        const sumBestSub = document.getElementById('sumBestStreakSub');
+        if (sumBestSub) {
+            sumBestSub.innerHTML = formatStreakSubtext(bestInfo.maxVal, bestInfo.ties, habits.length, 'best');
+        }
 
         // This week so far: a daily habit can be done once for each day since it started,
         // a weekly habit once for the whole week.
         let done = 0;
         let possible = 0;
         habits.forEach(h => {
+            const hStart = getHabitStartDate(h);
             if (isWeekly(h)) {
-                if (h.start > days[6] || days[0] > today) return;
+                if (hStart > days[6] || days[0] > today) return;
                 possible++;
-                if (days.some(d => h.completionsSet.has(d))) done++;
+                if (days.some(d => (h.completionsSet && h.completionsSet.has(d)) || (h.completions && h.completions.includes(d)))) done++;
             } else {
-                days.filter(d => d >= h.start && d <= today).forEach(d => {
+                days.filter(d => d >= hStart && d <= today).forEach(d => {
                     possible++;
-                    if (h.completionsSet.has(d)) done++;
+                    if ((h.completionsSet && h.completionsSet.has(d)) || (h.completions && h.completions.includes(d))) done++;
                 });
             }
         });
-        document.getElementById('sumWeeklyProgress').innerText = `${possible ? Math.round(done * 100 / possible) : 0}%`;
+        const weeklyPct = possible ? Math.round(done * 100 / possible) : 0;
+        document.getElementById('sumWeeklyProgress').innerText = `${weeklyPct}%`;
 
         // Average of each habit's completion since its start date, worked out on the server.
         const overall = habits.length
@@ -713,9 +805,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const today = formatDateIso(new Date());
         const thisWeek = weekDates(getMonday(new Date()));
 
-        const html = habits.filter(h => h.start <= today).map(h => {
+        const html = habits.filter(h => getHabitStartDate(h) <= today).map(h => {
             const weekly = isWeekly(h);
-            const done = weekly ? thisWeek.some(d => h.completionsSet.has(d)) : h.completionsSet.has(today);
+            const isDone = (d) => (h.completionsSet && h.completionsSet.has(d)) || (h.completions && h.completions.includes(d));
+            const done = weekly ? thisWeek.some(isDone) : isDone(today);
             const status = done ? (weekly ? '✓ Done this week' : '✓ Done') : (weekly ? 'This week' : 'Pending');
             return `
                 <div class="today-habit-item ${done ? 'completed' : ''}">
@@ -735,10 +828,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="stat-item">
                 <div class="stat-item-info">
                     <h4>${esc(h.name)}</h4>
-                    <p>Streak: ${streakText(h, h.currentStreak || 0)} | Best: ${streakText(h, h.bestStreak || 0)}</p>
+                    <p>
+                        <span class="table-streak-val" style="font-size: 12px;"><span class="icon" style="font-size: 14px;">local_fire_department</span>${streakText(h, h.currentStreak || 0)}</span>
+                        <span style="color:#94a3b8; margin: 0 5px;">•</span>
+                        <span class="table-best-val" style="font-size: 12px;"><span class="icon" style="font-size: 14px;">emoji_events</span>Best: ${streakText(h, h.bestStreak || 0)}</span>
+                    </p>
                 </div>
                 <div class="stat-value">${h.completionPercentage || 0}%</div>
-            </div>`).join('') || '<p>No data yet.</p>';
+            </div>`).join('') || '<p class="text-muted">No habit data recorded yet.</p>';
     }
 
     // Color mapping for weekly progress graph based on completion percentage tiers
@@ -834,12 +931,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                     const done = weeklyChartInstance.dayCounts[index] || 0;
                                     const total = weeklyChartInstance.dayTotals[index] || 0;
 
-                                    if (pct >= 100) return ` ${pct}% Complete (${done}/${total}) — 100% Done! 🎉`;
-                                    if (pct >= 75)  return ` ${pct}% Complete (${done}/${total}) — Almost done! 🌟`;
-                                    if (pct >= 50)  return ` ${pct}% Complete (${done}/${total}) — 50%+ Halfway! ⚡`;
-                                    if (pct >= 25)  return ` ${pct}% Complete (${done}/${total}) — 25%+ Progress! 💪`;
-                                    if (pct > 0)    return ` ${pct}% Complete (${done}/${total}) — Started 🔥`;
-                                    return ` 0% Complete (${done}/${total}) — No habits done`;
+                                    if (pct >= 100) return ` ${pct}% Complete (${done}/${total}) — 100% Done`;
+                                    if (pct >= 75)  return ` ${pct}% Complete (${done}/${total}) — Strong Progress`;
+                                    if (pct >= 50)  return ` ${pct}% Complete (${done}/${total}) — Halfway There`;
+                                    if (pct >= 25)  return ` ${pct}% Complete (${done}/${total}) — In Progress`;
+                                    if (pct > 0)    return ` ${pct}% Complete (${done}/${total}) — Started`;
+                                    return ` 0% Complete (${done}/${total}) — No check-ins`;
                                 }
                             }
                         }
@@ -927,32 +1024,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. KPI Calculations
         let totalCheckIns = 0;
-        let currentStreakMax = 0;
-        let currentStreakHabit = 'None';
-        let bestStreakMax = 0;
-        let bestStreakHabit = 'None';
-
         habits.forEach(h => {
             const count = h.completions ? h.completions.length : 0;
             totalCheckIns += count;
-
-            if ((h.currentStreak || 0) > currentStreakMax) {
-                currentStreakMax = h.currentStreak || 0;
-                currentStreakHabit = h.name;
-            }
-            if ((h.bestStreak || 0) > bestStreakMax) {
-                bestStreakMax = h.bestStreak || 0;
-                bestStreakHabit = h.name;
-            }
         });
+
+        const currInfo = streakLeaderInfo('currentStreak');
+        const bestInfo = streakLeaderInfo('bestStreak');
+        const perfectStreak = calculatePerfectStreak(habits);
 
         let totalDue = 0;
         let totalDone = 0;
         const dailyRateMap = {};
 
         dateList.forEach(iso => {
-            const dueHabits = habits.filter(h => !isWeekly(h) && h.start <= iso);
-            const doneHabits = dueHabits.filter(h => h.completionsSet.has(iso));
+            const dueHabits = habits.filter(h => !isWeekly(h) && getHabitStartDate(h) <= iso);
+            const doneHabits = dueHabits.filter(h => 
+                (h.completionsSet && h.completionsSet.has(iso)) || (h.completions && h.completions.includes(iso))
+            );
             const dueCount = dueHabits.length;
             const doneCount = doneHabits.length;
             const pct = dueCount > 0 ? Math.round((doneCount * 100) / dueCount) : 0;
@@ -962,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalDone += doneCount;
         });
 
-        // Perfect Days
+        // Perfect Days count
         let perfectDays = 0;
         dateList.forEach(iso => {
             const d = dailyRateMap[iso];
@@ -982,21 +1071,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subtextEl = document.getElementById('statsOverallSubtext');
         if (subtextEl) {
-            if (overallConsistency >= 80) subtextEl.innerText = 'Exceptional discipline! 🌟';
-            else if (overallConsistency >= 60) subtextEl.innerText = 'Solid consistency! Keep it up ⚡';
-            else if (overallConsistency >= 40) subtextEl.innerText = 'Building momentum! 🌱';
-            else subtextEl.innerText = 'Ready to build new momentum 🎯';
+            if (overallConsistency >= 80) {
+                subtextEl.innerHTML = `<span class="subtext-badge subtext-pill-emerald"><span class="icon subtext-icon">stars</span> Exceptional discipline</span>`;
+            } else if (overallConsistency >= 60) {
+                subtextEl.innerHTML = `<span class="subtext-badge subtext-pill-blue"><span class="icon subtext-icon">bolt</span> Solid consistency</span>`;
+            } else if (overallConsistency >= 40) {
+                subtextEl.innerHTML = `<span class="subtext-badge subtext-pill-indigo"><span class="icon subtext-icon">trending_up</span> Building momentum</span>`;
+            } else {
+                subtextEl.innerHTML = `<span class="subtext-badge subtext-pill-amber"><span class="icon subtext-icon">flag</span> Ready to build momentum</span>`;
+            }
         }
 
         const currStreakEl = document.getElementById('statsCurrentStreak');
-        if (currStreakEl) currStreakEl.innerText = `${currentStreakMax} day${currentStreakMax === 1 ? '' : 's'}`;
+        if (currStreakEl) currStreakEl.innerText = currInfo.text;
         const currStreakHabitEl = document.getElementById('statsCurrentStreakHabit');
-        if (currStreakHabitEl) currStreakHabitEl.innerText = currentStreakMax > 0 ? `🔥 ${esc(currentStreakHabit)}` : 'No active streak';
+        if (currStreakHabitEl) {
+            currStreakHabitEl.innerHTML = formatStreakSubtext(currInfo.maxVal, currInfo.ties, habits.length, 'current');
+        }
 
         const bestStreakEl = document.getElementById('statsBestStreak');
-        if (bestStreakEl) bestStreakEl.innerText = `${bestStreakMax} day${bestStreakMax === 1 ? '' : 's'}`;
+        if (bestStreakEl) bestStreakEl.innerText = bestInfo.text;
         const bestStreakHabitEl = document.getElementById('statsBestStreakHabit');
-        if (bestStreakHabitEl) bestStreakHabitEl.innerText = bestStreakMax > 0 ? `🏆 ${esc(bestStreakHabit)}` : 'Personal record';
+        if (bestStreakHabitEl) {
+            bestStreakHabitEl.innerHTML = formatStreakSubtext(bestInfo.maxVal, bestInfo.ties, habits.length, 'best');
+        }
 
         const totalTicksEl = document.getElementById('statsTotalCompletions');
         if (totalTicksEl) totalTicksEl.innerText = totalCheckIns;
@@ -1004,8 +1102,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const perfectDaysEl = document.getElementById('statsPerfectDays');
         if (perfectDaysEl) perfectDaysEl.innerText = perfectDays;
 
+        const perfectDaysSubEl = document.getElementById('statsPerfectDaysSub');
+        if (perfectDaysSubEl) {
+            perfectDaysSubEl.innerHTML = perfectStreak > 0
+                ? `<span class="subtext-badge subtext-pill-emerald"><span class="icon subtext-icon">verified</span>${perfectStreak} day${perfectStreak === 1 ? '' : 's'} perfect run</span>`
+                : '100% completion days';
+        }
+
         // 2. Render Smart Insights
-        renderSmartInsights(dateList, dailyRateMap, habits, overallConsistency, currentStreakMax, currentStreakHabit);
+        renderSmartInsights(dateList, dailyRateMap, habits, overallConsistency, currInfo, perfectStreak);
 
         // 3. Render Consistency Trajectory Chart
         renderStatsTrendChart(dateList, dailyRateMap);
@@ -1023,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderLeaderboardTable();
     }
 
-    function renderSmartInsights(dateList, dailyRateMap, habits, overallRate, currentStreak, currentStreakHabit) {
+    function renderSmartInsights(dateList, dailyRateMap, habits, overallRate, currInfo, perfectStreak = 0) {
         const grid = document.getElementById('statsInsightsGrid');
         if (!grid) return;
 
@@ -1077,11 +1182,20 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `Your peak consistency occurs on <strong>${fullDayNames[bestDowIdx]}</strong> with a <strong>${bestDowRate}%</strong> completion rate.`
             : 'Track habits over multiple days to reveal your peak performance patterns.';
 
-        // Top habit
-        const topHabit = [...habits].sort((a, b) => (b.completionPercentage || 0) - (a.completionPercentage || 0))[0];
-        const championText = topHabit
-            ? `<strong>${esc(topHabit.name)}</strong> is leading with <strong>${topHabit.completionPercentage || 0}%</strong> consistency and a ${topHabit.currentStreak || 0}-day streak.`
-            : 'Keep ticking habits daily to see your top performing routine.';
+        // Top habit or tied champions
+        let championText = '';
+        const maxPct = habits.length > 0 ? Math.max(...habits.map(h => h.completionPercentage || 0)) : 0;
+        const champions = habits.filter(h => (h.completionPercentage || 0) === maxPct && maxPct > 0);
+        if (champions.length === habits.length && habits.length > 1) {
+            championText = `Outstanding discipline! <strong>All ${habits.length} habits</strong> are tied at <strong>${maxPct}%</strong> consistency (${currInfo.text} streak).`;
+        } else if (champions.length > 1) {
+            championText = `<strong>${champions.map(h => esc(h.name)).join(' and ')}</strong> share top honors tied at <strong>${maxPct}%</strong> consistency.`;
+        } else if (champions.length === 1) {
+            const h = champions[0];
+            championText = `<strong>${esc(h.name)}</strong> is leading with <strong>${h.completionPercentage || 0}%</strong> consistency and a ${streakText(h, h.currentStreak || 0)} streak.`;
+        } else {
+            championText = 'Keep ticking habits daily to see your top performing routine.';
+        }
 
         // Actionable optimization tip
         let tipText = 'Consistency compounds! Even completing a single 2-minute habit daily strengthens habit loops.';
@@ -1091,7 +1205,20 @@ document.addEventListener('DOMContentLoaded', () => {
             tipText = 'You are performing in the top tier! Consider adding an incremental habit to challenge yourself.';
         }
 
+        let perfectRunPill = '';
+        if (perfectStreak > 0) {
+            perfectRunPill = `
+                <div class="insight-pill" style="border-left: 3px solid #10b981;">
+                    <span class="insight-icon" style="color: #10b981;">verified</span>
+                    <div class="insight-content">
+                        <strong>All-Habits Streak Active</strong>
+                        <p>You completed 100% of all scheduled habits for <strong>${perfectStreak} consecutive day${perfectStreak === 1 ? '' : 's'}</strong>! Flawless consistency.</p>
+                    </div>
+                </div>`;
+        }
+
         grid.innerHTML = `
+            ${perfectRunPill}
             <div class="insight-pill">
                 <span class="insight-icon" style="color: #10b981;">trending_up</span>
                 <div class="insight-content">
@@ -1435,13 +1562,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let badgeHtml = '';
             if (pct >= 80) {
-                badgeHtml = '<span class="discipline-badge badge-fire">🔥 On Fire</span>';
+                badgeHtml = '<span class="discipline-badge badge-fire"><span class="icon badge-icon">local_fire_department</span><span>On Fire</span></span>';
             } else if (pct >= 55) {
-                badgeHtml = '<span class="discipline-badge badge-steady">⚡ Steady</span>';
+                badgeHtml = '<span class="discipline-badge badge-steady"><span class="icon badge-icon">bolt</span><span>Steady</span></span>';
             } else if (pct >= 30) {
-                badgeHtml = '<span class="discipline-badge badge-emerging">🌱 Emerging</span>';
+                badgeHtml = '<span class="discipline-badge badge-emerging"><span class="icon badge-icon">trending_up</span><span>Emerging</span></span>';
             } else {
-                badgeHtml = '<span class="discipline-badge badge-focus">⚠️ Needs Focus</span>';
+                badgeHtml = '<span class="discipline-badge badge-focus"><span class="icon badge-icon">priority_high</span><span>Needs Focus</span></span>';
             }
 
             const tierColor = getWeeklyProgressColor(pct).border;
@@ -1451,8 +1578,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><strong>${esc(h.name)}</strong></td>
                     <td><span class="cat-legend-item" style="padding: 2px 8px; font-size: 11.5px;">${esc(h.category || 'General')}</span></td>
                     <td>${isWeekly(h) ? 'Weekly' : 'Daily'}</td>
-                    <td><span style="font-weight: 600; color: #ea580c;">${streakText(h, streak)}</span></td>
-                    <td><span style="font-weight: 600; color: #ca8a04;">${streakText(h, best)}</span></td>
+                    <td><span class="table-streak-val"><span class="icon table-streak-icon">local_fire_department</span>${streakText(h, streak)}</span></td>
+                    <td><span class="table-best-val"><span class="icon table-best-icon">emoji_events</span>${streakText(h, best)}</span></td>
                     <td><strong>${checkIns}</strong></td>
                     <td>
                         <div class="progress-bar-wrap">
@@ -1492,6 +1619,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 day: d.getDate()
             };
         }
+        if (Array.isArray(d)) {
+            return { year: d[0], month: d[1], day: d[2] };
+        }
         const str = String(d).split('T')[0];
         const parts = str.split('-');
         if (parts.length !== 3) return null;
@@ -1523,7 +1653,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const weekly = isWeekly(habit);
         const step = weekly ? 7 : 1;
         const todayDays = toEpochDays(new Date());
-        const startDays = toEpochDays(habit.startDate) ?? todayDays;
+        const rawStart = getHabitStartDate(habit);
+        const startDays = (rawStart ? toEpochDays(rawStart) : null) ?? todayDays;
 
         const now = periodOfDays(todayDays, weekly);
         const first = periodOfDays(startDays, weekly);
@@ -1533,7 +1664,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ed = toEpochDays(dStr);
             if (ed === null) return;
             const p = periodOfDays(ed, weekly);
-            if (p >= first && p <= now) {
+            if (p <= now) {
                 doneSet.add(p);
             }
         });
@@ -1557,7 +1688,11 @@ document.addEventListener('DOMContentLoaded', () => {
             p -= step;
         }
 
-        const daysBetween = now - first;
+        best = Math.max(best, current);
+
+        const earliestDone = done.length > 0 ? done[0] : first;
+        const effectiveFirst = Math.min(first, earliestDone);
+        const daysBetween = Math.max(0, now - effectiveFirst);
         const periods = Math.max(1, Math.floor(daysBetween / step) + 1);
         const completionPercentage = Math.min(100, Math.round((100.0 * done.length) / periods));
 
@@ -1565,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
         habit.bestStreak = best;
         habit.completionPercentage = completionPercentage;
         habit.completedDays = (habit.completions || []).length;
+        habit.completionsSet = new Set(habit.completions || []);
     }
 
     // ==========================================

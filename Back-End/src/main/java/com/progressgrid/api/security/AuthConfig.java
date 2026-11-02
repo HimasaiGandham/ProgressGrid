@@ -13,15 +13,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.io.IOException;
 
-/**
- * Requires a valid session token on every habit endpoint and exposes the caller's id to
- * controllers as a request attribute. Controllers must read the id from here, never from
- * anything the client sends.
- */
 @Configuration
 public class AuthConfig implements WebMvcConfigurer {
 
-    /** Request attribute holding the caller's user id, set only after their token checks out. */
     public static final String USER_ID = "authenticatedUserId";
 
     private final TokenService tokenService;

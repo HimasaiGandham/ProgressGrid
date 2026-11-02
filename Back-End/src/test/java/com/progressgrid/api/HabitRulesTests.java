@@ -189,6 +189,39 @@ class HabitRulesTests {
         assertThat(behind.get("perfectDays").asInt()).isZero();
     }
 
+    @Test
+    void multipleHabitsCompletedAllTiedForStreak() throws Exception {
+        String token = signUp();
+        long h1 = habitStarting(token, TODAY.minusDays(2), "Daily");
+        long h2 = habitStarting(token, TODAY.minusDays(2), "Daily");
+        long h3 = habitStarting(token, TODAY.minusDays(2), "Daily");
+
+        // Tick all 3 habits for yesterday and today
+        tick(token, h1, TODAY.minusDays(1));
+        tick(token, h1, TODAY);
+        tick(token, h2, TODAY.minusDays(1));
+        tick(token, h2, TODAY);
+        tick(token, h3, TODAY.minusDays(1));
+        tick(token, h3, TODAY);
+
+        JsonNode stats = mvc.perform(get("/api/habits/stats").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()
+                .transform(b -> {
+                    try {
+                        return json.readTree(b);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+        assertThat(stats.get("totalHabits").asInt()).isEqualTo(3);
+        assertThat(stats.get("currentStreak").asInt()).isEqualTo(2);
+        assertThat(stats.get("bestStreak").asInt()).isEqualTo(2);
+        assertThat(stats.get("perfectDays").asInt()).isEqualTo(2);
+        assertThat(stats.get("overallCompletionPercentage").asInt()).isGreaterThan(0);
+    }
+
     private JsonNode stats(String token, String timeZone) throws Exception {
         String body = mvc.perform(get("/api/habits/stats").header("Authorization", token).header("X-Timezone", timeZone))
                 .andExpect(status().isOk())

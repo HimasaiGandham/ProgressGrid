@@ -80,25 +80,55 @@
 
             <!-- SUMMARY SECTION -->
             <section class="summary-cards">
-                <div class="card summary-card">
-                    <h3>Total Habits</h3>
-                    <h2 id="sumTotalHabits">0</h2>
+                <div class="card summary-card kpi-style-card" id="sumTotalHabitsCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(99, 102, 241, 0.12); color: #6366f1;">
+                        <span class="icon">format_list_bulleted</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Total Habits</span>
+                        <h2 class="kpi-value" id="sumTotalHabits">0</h2>
+                        <span class="kpi-subtext" id="sumTotalHabitsSub">Active routines</span>
+                    </div>
                 </div>
-                <div class="card summary-card">
-                    <h3>Current Streak</h3>
-                    <h2 id="sumCurrentStreak">0 days</h2>
+                <div class="card summary-card kpi-style-card" id="sumCurrentStreakCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(249, 115, 22, 0.12); color: #f97316;">
+                        <span class="icon">local_fire_department</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Current Streak</span>
+                        <h2 class="kpi-value" id="sumCurrentStreak">0 days</h2>
+                        <span class="kpi-subtext" id="sumCurrentStreakSub">Active streak leader</span>
+                    </div>
                 </div>
-                <div class="card summary-card">
-                    <h3>Best Streak</h3>
-                    <h2 id="sumBestStreak">0 days</h2>
+                <div class="card summary-card kpi-style-card" id="sumBestStreakCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(234, 179, 8, 0.12); color: #eab308;">
+                        <span class="icon">emoji_events</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Best Streak</span>
+                        <h2 class="kpi-value" id="sumBestStreak">0 days</h2>
+                        <span class="kpi-subtext" id="sumBestStreakSub">Personal record</span>
+                    </div>
                 </div>
-                <div class="card summary-card">
-                    <h3>Weekly Completion</h3>
-                    <h2 id="sumWeeklyProgress">0%</h2>
+                <div class="card summary-card kpi-style-card" id="sumWeeklyProgressCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                        <span class="icon">trending_up</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Weekly Completion</span>
+                        <h2 class="kpi-value" id="sumWeeklyProgress">0%</h2>
+                        <span class="kpi-subtext" id="sumWeeklyProgressSub">This week's pace</span>
+                    </div>
                 </div>
-                <div class="card summary-card">
-                    <h3>Overall Completion</h3>
-                    <h2 id="sumMonthlyProgress">0%</h2>
+                <div class="card summary-card kpi-style-card" id="sumMonthlyProgressCard">
+                    <div class="kpi-icon-wrap" style="background: rgba(168, 85, 247, 0.12); color: #a855f7;">
+                        <span class="icon">donut_large</span>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">Overall Completion</span>
+                        <h2 class="kpi-value" id="sumMonthlyProgress">0%</h2>
+                        <span class="kpi-subtext" id="sumMonthlyProgressSub">All-time consistency</span>
+                    </div>
                 </div>
             </section>
 
@@ -199,7 +229,7 @@
                     <div class="kpi-body">
                         <span class="kpi-label">Perfect Days</span>
                         <h2 class="kpi-value" id="statsPerfectDays">0</h2>
-                        <span class="kpi-subtext">100% completion days</span>
+                        <span class="kpi-subtext" id="statsPerfectDaysSub">100% completion days</span>
                     </div>
                 </div>
             </section>

@@ -270,6 +270,7 @@ public class HabitService {
             current++;
         }
 
+        best = Math.max(best, current);
         long periods = Math.max(1, ChronoUnit.DAYS.between(first, now) / step + 1);
         dto.setCurrentStreak(current);
         dto.setBestStreak(best);

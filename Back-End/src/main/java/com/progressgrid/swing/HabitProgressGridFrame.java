@@ -2,65 +2,67 @@ package com.progressgrid.swing;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.List;
 
 /**
- * HabitProgressGridFrame - Main Interactive Habit Tracking Grid & Heatmap Application.
- * 
- * Demonstrates advanced Java Swing concepts:
- * 1. Custom 2D Graphics Painting (paintComponent, Graphics2D, Antialiasing, Gradients)
- * 2. Custom Heatmap Grid Component with Mouse Hover & Click Detection
- * 3. JTable with custom AbstractTableModel, TableCellRenderer, and TableRowSorter
- * 4. Multi-threaded background tasks using SwingWorker (Non-blocking EDT)
- * 5. Dynamic filtering via DocumentListener on JTextField
- * 6. Custom Modal JDialog with GridBagLayout, ButtonGroup, and validation
- * 7. Modern UI design using BorderLayout, JSplitPane, JToolBar, JMenuBar, and Status Bar
+ * HabitProgressGridFrame - Pixel-perfect desktop implementation matching
+ * the ProgressGrid modern light web dashboard (himasaigandham.github.io/ProgressGrid).
  */
 public class HabitProgressGridFrame extends JFrame {
 
-    // Color Palette
-    public static final Color PRIMARY = new Color(79, 70, 229);      // Indigo
-    public static final Color PRIMARY_DARK = new Color(67, 56, 202);
-    public static final Color SUCCESS = new Color(16, 185, 129);      // Emerald green
-    public static final Color WARNING = new Color(245, 158, 11);      // Amber
-    public static final Color DANGER = new Color(239, 68, 68);        // Rose
-    public static final Color BG_DARK = new Color(15, 23, 42);        // Slate 900
-    public static final Color CARD_BG = new Color(30, 41, 59);        // Slate 800
-    public static final Color TEXT_LIGHT = new Color(248, 250, 252);
-    public static final Color TEXT_MUTED = new Color(148, 163, 184);
-    public static final Color BORDER_COLOR = new Color(51, 65, 85);
+    // Theme Color Palette matching the web application
+    public static final Color BG_PAGE = new Color(248, 250, 252);        // #f8fafc Light Gray
+    public static final Color CARD_BG = Color.WHITE;                      // #ffffff Pure White
+    public static final Color BRAND_GREEN = new Color(16, 185, 129);     // #10b981 Emerald Green
+    public static final Color BRAND_GREEN_DARK = new Color(5, 150, 105); // #059669
+    public static final Color BRAND_GREEN_LIGHT = new Color(236, 253, 245);// #ecfdf5 Mint Pill
+    public static final Color TEXT_DARK = new Color(17, 24, 39);          // #111827 Dark Slate
+    public static final Color TEXT_MUTED = new Color(107, 114, 128);      // #6b7280 Cool Gray
+    public static final Color BORDER_COLOR = new Color(229, 231, 235);    // #e5e7eb Divider Gray
+    public static final Color DANGER_RED = new Color(239, 68, 68);        // #ef4444 Soft Red
+
+    // Legacy color constants for compatibility with launcher/sub-frames
+    public static final Color PRIMARY = BRAND_GREEN;
+    public static final Color PRIMARY_DARK = BRAND_GREEN_DARK;
+    public static final Color SUCCESS = BRAND_GREEN;
+    public static final Color WARNING = new Color(245, 158, 11);
+    public static final Color DANGER = DANGER_RED;
+    public static final Color BG_DARK = BG_PAGE;
+    public static final Color TEXT_LIGHT = TEXT_DARK;
 
     // Data structures
     public static class HabitItem {
         private final long id;
         private String title;
         private String category;
-        private String frequency; // "DAILY" or "WEEKLY"
+        private String frequency; // "Daily" or "Weekly"
+        private LocalDate startDate;
         private int currentStreak;
         private int bestStreak;
         private double completionRate;
         private final Set<LocalDate> completionDates = new HashSet<>();
 
-        public HabitItem(long id, String title, String category, String frequency, int currentStreak, int bestStreak, double completionRate) {
+        public HabitItem(long id, String title, String category, String frequency, LocalDate startDate, int currentStreak, int bestStreak, double completionRate) {
             this.id = id;
             this.title = title;
             this.category = category;
             this.frequency = frequency;
+            this.startDate = startDate != null ? startDate : LocalDate.now().minusDays(20);
             this.currentStreak = currentStreak;
             this.bestStreak = bestStreak;
             this.completionRate = completionRate;
+        }
+
+        public HabitItem(long id, String title, String category, String frequency, int currentStreak, int bestStreak, double completionRate) {
+            this(id, title, category, frequency, LocalDate.now().minusDays(20), currentStreak, bestStreak, completionRate);
         }
 
         public long getId() { return id; }
@@ -70,6 +72,7 @@ public class HabitProgressGridFrame extends JFrame {
         public void setCategory(String category) { this.category = category; }
         public String getFrequency() { return frequency; }
         public void setFrequency(String frequency) { this.frequency = frequency; }
+        public LocalDate getStartDate() { return startDate; }
         public int getCurrentStreak() { return currentStreak; }
         public int getBestStreak() { return bestStreak; }
         public double getCompletionRate() { return completionRate; }
@@ -82,876 +85,758 @@ public class HabitProgressGridFrame extends JFrame {
         public void toggleDate(LocalDate date) {
             if (completionDates.contains(date)) {
                 completionDates.remove(date);
-                if (currentStreak > 0) currentStreak--;
             } else {
                 completionDates.add(date);
-                currentStreak++;
-                if (currentStreak > bestStreak) bestStreak = currentStreak;
             }
-            recalcCompletionRate();
+            recalculateMetrics();
         }
 
-        private void recalcCompletionRate() {
-            int totalDays = 30;
-            this.completionRate = Math.min(100.0, (completionDates.size() * 100.0) / totalDays);
+        public void recalculateMetrics() {
+            LocalDate today = LocalDate.now();
+            int streak = 0;
+            LocalDate checkDate = today;
+
+            // Calculate streak backward
+            if (!completionDates.contains(checkDate)) {
+                checkDate = checkDate.minusDays(1);
+            }
+            while (completionDates.contains(checkDate)) {
+                streak++;
+                checkDate = checkDate.minusDays(1);
+            }
+
+            this.currentStreak = streak;
+            if (currentStreak > bestStreak) {
+                bestStreak = currentStreak;
+            }
+
+            int totalPeriod = 30;
+            this.completionRate = Math.min(100.0, (completionDates.size() * 100.0) / totalPeriod);
         }
     }
 
     private final List<HabitItem> habits = new ArrayList<>();
-    private HabitTableModel tableModel;
-    private JTable habitTable;
-    private TableRowSorter<HabitTableModel> rowSorter;
-    private ActivityHeatmapPanel heatmapPanel;
-    private JLabel statusLabel;
-    private JLabel totalCountLabel;
-    private JTextField searchField;
-    private JComboBox<String> categoryFilterBox;
+    private LocalDate currentWeekStart;
+
+    // Stat metric labels
+    private JLabel totalHabitsValue;
+    private JLabel currentStreakValue;
+    private JLabel bestStreakValue;
+    private JLabel weeklyCompletionValue;
+    private JLabel overallCompletionValue;
+    private JPanel gridRowsPanel;
+    private JLabel weekRangeLabel;
 
     public HabitProgressGridFrame() {
-        setTitle("ProgressGrid — Desktop Habit Tracker & Matrix Grid");
-        setSize(1200, 780);
-        setMinimumSize(new Dimension(950, 600));
+        setTitle("ProgressGrid — Habit Tracker");
+        setSize(1280, 820);
+        setMinimumSize(new Dimension(1050, 680));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        initializeMockData();
-        setupMenuBar();
-        setupComponents();
-        loadHabitDataAsync();
+        // Align current week to Monday
+        currentWeekStart = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        initializeDefaultHabits();
+        setupLayout();
+        refreshAllStats();
     }
 
-    private void initializeMockData() {
-        LocalDate today = LocalDate.now();
+    private void initializeDefaultHabits() {
+        // Matches exact items from user screenshot
+        LocalDate startDate = LocalDate.of(2026, 10, 6);
 
-        HabitItem h1 = new HabitItem(1, "Coding & DSA Practice", "Development", "DAILY", 8, 14, 85.0);
-        HabitItem h2 = new HabitItem(2, "Read Tech / Self-Growth Book", "Learning", "DAILY", 5, 12, 70.0);
-        HabitItem h3 = new HabitItem(3, "Morning Workout & Running", "Fitness", "DAILY", 12, 21, 92.0);
-        HabitItem h4 = new HabitItem(4, "System Design Study", "Education", "WEEKLY", 3, 6, 60.0);
-        HabitItem h5 = new HabitItem(5, "Drink 3L Water", "Health", "DAILY", 15, 15, 100.0);
-        HabitItem h6 = new HabitItem(6, "Review Daily College Notes", "Academics", "DAILY", 4, 9, 65.0);
-
-        // Populate completion dates for the last 30 days
-        for (int i = 0; i < 30; i++) {
-            LocalDate d = today.minusDays(i);
-            if (i % 2 == 0) h1.getCompletionDates().add(d);
-            if (i % 3 != 0) h2.getCompletionDates().add(d);
-            if (i < 12 || i % 4 == 0) h3.getCompletionDates().add(d);
-            if (i % 7 == 0) h4.getCompletionDates().add(d);
-            if (i < 15) h5.getCompletionDates().add(d);
-            if (i % 3 == 0) h6.getCompletionDates().add(d);
-        }
+        HabitItem h1 = new HabitItem(1, "Swiming", "Health", "Daily", startDate, 0, 3, 14.0);
+        HabitItem h2 = new HabitItem(2, "Leetcode", "Health", "Daily", startDate, 0, 2, 10.0);
+        HabitItem h3 = new HabitItem(3, "3 Liters of water", "Health", "Daily", startDate, 0, 3, 18.0);
 
         habits.add(h1);
         habits.add(h2);
         habits.add(h3);
-        habits.add(h4);
-        habits.add(h5);
-        habits.add(h6);
     }
 
-    private void setupMenuBar() {
-        JMenuBar menuBar = new JMenuBar();
-        menuBar.setBackground(CARD_BG);
-        menuBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR));
+    private void setupLayout() {
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(BG_PAGE);
 
-        // File Menu
-        JMenu fileMenu = new JMenu("File");
-        fileMenu.setForeground(TEXT_LIGHT);
-        fileMenu.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        // 1. Left Sidebar Navigation
+        JPanel sidebar = createSidebar();
+        root.add(sidebar, BorderLayout.WEST);
 
-        JMenuItem refreshItem = new JMenuItem("Refresh Data (F5)");
-        refreshItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
-        refreshItem.addActionListener(e -> loadHabitDataAsync());
+        // 2. Main Content Dashboard
+        JPanel mainContent = createMainContent();
+        JScrollPane scrollPane = new JScrollPane(mainContent);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getViewport().setBackground(BG_PAGE);
 
-        JMenuItem exitItem = new JMenuItem("Exit");
-        exitItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK));
-        exitItem.addActionListener(e -> dispose());
-
-        fileMenu.add(refreshItem);
-        fileMenu.addSeparator();
-        fileMenu.add(exitItem);
-
-        // Habits Menu
-        JMenu habitMenu = new JMenu("Habits");
-        habitMenu.setForeground(TEXT_LIGHT);
-        habitMenu.setFont(new Font("Segoe UI", Font.BOLD, 13));
-
-        JMenuItem addHabitItem = new JMenuItem("Add New Habit... (Ctrl+N)");
-        addHabitItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK));
-        addHabitItem.addActionListener(e -> showAddHabitDialog());
-
-        JMenuItem toggleItem = new JMenuItem("Toggle Today's Check (Space)");
-        toggleItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0));
-        toggleItem.addActionListener(e -> toggleSelectedHabitToday());
-
-        JMenuItem deleteItem = new JMenuItem("Delete Selected Habit (Del)");
-        deleteItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0));
-        deleteItem.addActionListener(e -> deleteSelectedHabit());
-
-        habitMenu.add(addHabitItem);
-        habitMenu.add(toggleItem);
-        habitMenu.add(deleteItem);
-
-        // Views Menu
-        JMenu viewMenu = new JMenu("Analytics");
-        viewMenu.setForeground(TEXT_LIGHT);
-        viewMenu.setFont(new Font("Segoe UI", Font.BOLD, 13));
-
-        JMenuItem analyticsItem = new JMenuItem("Open Visual Analytics Dashboard (F2)");
-        analyticsItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0));
-        analyticsItem.addActionListener(e -> openAnalyticsDashboard());
-
-        viewMenu.add(analyticsItem);
-
-        menuBar.add(fileMenu);
-        menuBar.add(habitMenu);
-        menuBar.add(viewMenu);
-
-        setJMenuBar(menuBar);
+        root.add(scrollPane, BorderLayout.CENTER);
+        setContentPane(root);
     }
 
-    private void setupComponents() {
-        JPanel contentPane = new JPanel(new BorderLayout(0, 0));
-        contentPane.setBackground(BG_DARK);
+    // ----------------------------------------------------------------------------------------
+    // LEFT SIDEBAR (Matching Sidebar in Screenshot)
+    // ----------------------------------------------------------------------------------------
+    private JPanel createSidebar() {
+        JPanel sidebar = new JPanel(new BorderLayout());
+        sidebar.setPreferredSize(new Dimension(220, 0));
+        sidebar.setBackground(CARD_BG);
+        sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, BORDER_COLOR));
 
-        // 1. Header Toolbar
-        JPanel topPanel = createTopPanel();
-        contentPane.add(topPanel, BorderLayout.NORTH);
+        // Top Brand Logo
+        JPanel brandPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 24));
+        brandPanel.setBackground(CARD_BG);
 
-        // 2. Center SplitPane: Top = Table of Habits, Bottom = Interactive Heatmap Grid
-        tableModel = new HabitTableModel(habits);
-        rowSorter = new TableRowSorter<>(tableModel);
-
-        habitTable = new JTable(tableModel);
-        habitTable.setRowSorter(rowSorter);
-        habitTable.setRowHeight(38);
-        habitTable.setBackground(CARD_BG);
-        habitTable.setForeground(TEXT_LIGHT);
-        habitTable.setGridColor(BORDER_COLOR);
-        habitTable.setSelectionBackground(new Color(67, 56, 202, 180));
-        habitTable.setSelectionForeground(Color.WHITE);
-        habitTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        habitTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
-        habitTable.getTableHeader().setBackground(new Color(24, 32, 47));
-        habitTable.getTableHeader().setForeground(TEXT_LIGHT);
-        habitTable.getTableHeader().setPreferredSize(new Dimension(0, 35));
-
-        // Custom Renderers for Columns
-        habitTable.getColumnModel().getColumn(1).setCellRenderer(new CategoryBadgeRenderer());
-        habitTable.getColumnModel().getColumn(3).setCellRenderer(new StreakCellRenderer());
-        habitTable.getColumnModel().getColumn(4).setCellRenderer(new ProgressBarCellRenderer());
-
-        habitTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                int selectedRow = habitTable.getSelectedRow();
-                if (selectedRow >= 0) {
-                    int modelIndex = habitTable.convertRowIndexToModel(selectedRow);
-                    heatmapPanel.setSelectedHabit(habits.get(modelIndex));
-                }
+        // 4-Squares Icon
+        JLabel logoIcon = new JLabel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(BRAND_GREEN);
+                int s = 7;
+                int r = 2;
+                g2.fillRoundRect(0, 0, s, s, r, r);
+                g2.fillRoundRect(10, 0, s, s, r, r);
+                g2.fillRoundRect(0, 10, s, s, r, r);
+                g2.fillRoundRect(10, 10, s, s, r, r);
+                g2.dispose();
             }
-        });
 
-        JScrollPane tableScrollPane = new JScrollPane(habitTable);
-        tableScrollPane.getViewport().setBackground(CARD_BG);
-        tableScrollPane.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR),
-                " All Monitored Habits (Click a habit to inspect in Matrix Grid) ",
-                0, 0, new Font("Segoe UI", Font.BOLD, 13), TEXT_MUTED
-        ));
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(20, 20);
+            }
+        };
 
-        // Bottom Heatmap Component
-        heatmapPanel = new ActivityHeatmapPanel(habits.isEmpty() ? null : habits.get(0));
-        JScrollPane heatmapScrollPane = new JScrollPane(heatmapPanel);
-        heatmapScrollPane.getViewport().setBackground(BG_DARK);
-        heatmapScrollPane.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR),
-                " 30-Day Activity Progress Heatmap Matrix (Click any cell to toggle completion) ",
-                0, 0, new Font("Segoe UI", Font.BOLD, 13), TEXT_MUTED
-        ));
+        JLabel brandText = new JLabel("ProgressGrid");
+        brandText.setFont(new Font("Segoe UI", Font.BOLD, 19));
+        brandText.setForeground(BRAND_GREEN);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tableScrollPane, heatmapScrollPane);
-        splitPane.setDividerLocation(340);
-        splitPane.setResizeWeight(0.5);
-        splitPane.setDividerSize(6);
-        splitPane.setBackground(BG_DARK);
-        splitPane.setBorder(new EmptyBorder(10, 16, 6, 16));
+        brandPanel.add(logoIcon);
+        brandPanel.add(brandText);
+        sidebar.add(brandPanel, BorderLayout.NORTH);
 
-        contentPane.add(splitPane, BorderLayout.CENTER);
+        // Sidebar Navigation Links
+        JPanel navMenu = new JPanel();
+        navMenu.setLayout(new BoxLayout(navMenu, BoxLayout.Y_AXIS));
+        navMenu.setBackground(CARD_BG);
+        navMenu.setBorder(new EmptyBorder(10, 14, 10, 14));
 
-        // 3. Status Bar at Bottom
-        JPanel statusBar = createStatusBar();
-        contentPane.add(statusBar, BorderLayout.SOUTH);
+        navMenu.add(createNavItem("Dashboard", "▦", true, null));
+        navMenu.add(Box.createVerticalStrut(6));
+        navMenu.add(createNavItem("My Habits", "✔", false, null));
+        navMenu.add(Box.createVerticalStrut(6));
+        navMenu.add(createNavItem("Statistics", "📊", false, e -> openAnalyticsDashboard()));
+        navMenu.add(Box.createVerticalStrut(6));
+        navMenu.add(createNavItem("Calendar", "📅", false, null));
+        navMenu.add(Box.createVerticalStrut(6));
+        navMenu.add(createNavItem("Profile Settings", "⚙", false, null));
 
-        setContentPane(contentPane);
+        sidebar.add(navMenu, BorderLayout.CENTER);
+        return sidebar;
     }
 
-    private JPanel createTopPanel() {
-        JPanel headerPanel = new JPanel(new BorderLayout(15, 10));
-        headerPanel.setBackground(BG_DARK);
-        headerPanel.setBorder(new EmptyBorder(14, 16, 6, 16));
+    private JPanel createNavItem(String text, String icon, boolean active, ActionListener action) {
+        JPanel item = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        item.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+        item.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        // Title and Logo
-        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        titlePanel.setBackground(BG_DARK);
+        if (active) {
+            item.setBackground(BRAND_GREEN_LIGHT);
+        } else {
+            item.setBackground(CARD_BG);
+        }
 
-        JLabel logoBadge = new JLabel(" ■ ");
-        logoBadge.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        logoBadge.setForeground(PRIMARY);
+        JLabel lblIcon = new JLabel(icon);
+        lblIcon.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 15));
+        lblIcon.setForeground(active ? BRAND_GREEN : TEXT_MUTED);
 
-        JLabel titleLabel = new JLabel("ProgressGrid");
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        titleLabel.setForeground(TEXT_LIGHT);
+        JLabel lblText = new JLabel(text);
+        lblText.setFont(new Font("Segoe UI", active ? Font.BOLD : Font.PLAIN, 14));
+        lblText.setForeground(active ? BRAND_GREEN : new Color(75, 85, 99));
 
-        JLabel subtitleLabel = new JLabel(" | Habit Activity Tracker & Interactive Grid");
-        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        subtitleLabel.setForeground(TEXT_MUTED);
+        item.add(lblIcon);
+        item.add(lblText);
 
-        titlePanel.add(logoBadge);
-        titlePanel.add(titleLabel);
-        titlePanel.add(subtitleLabel);
-
-        // Action Toolbar
-        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        controlsPanel.setBackground(BG_DARK);
-
-        // Search Filter Field
-        searchField = new JTextField(14);
-        searchField.setPreferredSize(new Dimension(150, 32));
-        searchField.setBackground(CARD_BG);
-        searchField.setForeground(TEXT_LIGHT);
-        searchField.setCaretColor(TEXT_LIGHT);
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(4, 8, 4, 8)
-        ));
-        searchField.setToolTipText("Search habit by title...");
-        searchField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { filterTable(); }
-            public void removeUpdate(DocumentEvent e) { filterTable(); }
-            public void changedUpdate(DocumentEvent e) { filterTable(); }
-        });
-
-        JLabel searchIcon = new JLabel("🔍");
-        searchIcon.setForeground(TEXT_MUTED);
-
-        // Category Filter
-        categoryFilterBox = new JComboBox<>(new String[]{"All Categories", "Development", "Learning", "Fitness", "Education", "Health", "Academics"});
-        categoryFilterBox.setPreferredSize(new Dimension(140, 32));
-        categoryFilterBox.setBackground(CARD_BG);
-        categoryFilterBox.setForeground(TEXT_LIGHT);
-        categoryFilterBox.addActionListener(e -> filterTable());
-
-        // Buttons
-        JButton addBtn = createStyledButton("+ New Habit", PRIMARY, Color.WHITE);
-        addBtn.addActionListener(e -> showAddHabitDialog());
-
-        JButton toggleTodayBtn = createStyledButton("✔ Check Today", SUCCESS, Color.WHITE);
-        toggleTodayBtn.addActionListener(e -> toggleSelectedHabitToday());
-
-        JButton analyticsBtn = createStyledButton("📊 View Analytics", new Color(139, 92, 246), Color.WHITE);
-        analyticsBtn.addActionListener(e -> openAnalyticsDashboard());
-
-        controlsPanel.add(searchIcon);
-        controlsPanel.add(searchField);
-        controlsPanel.add(categoryFilterBox);
-        controlsPanel.add(addBtn);
-        controlsPanel.add(toggleTodayBtn);
-        controlsPanel.add(analyticsBtn);
-
-        headerPanel.add(titlePanel, BorderLayout.WEST);
-        headerPanel.add(controlsPanel, BorderLayout.EAST);
-
-        return headerPanel;
-    }
-
-    private JPanel createStatusBar() {
-        JPanel statusPanel = new JPanel(new BorderLayout(10, 0));
-        statusPanel.setBackground(CARD_BG);
-        statusPanel.setBorder(new EmptyBorder(6, 16, 6, 16));
-
-        statusLabel = new JLabel("● Ready — Loaded local & synced habit state.");
-        statusLabel.setForeground(SUCCESS);
-        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-
-        totalCountLabel = new JLabel("Total Habits: " + habits.size() + " | Today: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy")));
-        totalCountLabel.setForeground(TEXT_MUTED);
-        totalCountLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-
-        statusPanel.add(statusLabel, BorderLayout.WEST);
-        statusPanel.add(totalCountLabel, BorderLayout.EAST);
-
-        return statusPanel;
-    }
-
-    private JButton createStyledButton(String text, Color bg, Color fg) {
-        JButton btn = new JButton(text);
-        btn.setBackground(bg);
-        btn.setForeground(fg);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        btn.setFocusPainted(false);
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(bg.darker(), 1, true),
-                new EmptyBorder(6, 14, 6, 14)
-        ));
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        btn.addMouseListener(new MouseAdapter() {
+        item.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (action != null) action.actionPerformed(null);
+            }
+            @Override
             public void mouseEntered(MouseEvent e) {
-                btn.setBackground(bg.brighter());
+                if (!active) item.setBackground(new Color(243, 244, 246));
             }
+            @Override
             public void mouseExited(MouseEvent e) {
-                btn.setBackground(bg);
+                if (!active) item.setBackground(CARD_BG);
+            }
+        });
+
+        return item;
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // MAIN DASHBOARD CONTENT
+    // ----------------------------------------------------------------------------------------
+    private JPanel createMainContent() {
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(BG_PAGE);
+        content.setBorder(new EmptyBorder(26, 36, 36, 36));
+
+        // 1. Top Header Row (Title on Left, User & Controls on Right)
+        content.add(createHeaderBar());
+        content.add(Box.createVerticalStrut(24));
+
+        // 2. Five Metric KPI Cards Row
+        content.add(createMetricCardsRow());
+        content.add(Box.createVerticalStrut(26));
+
+        // 3. Habit Grid Card
+        content.add(createHabitGridCard());
+
+        return content;
+    }
+
+    private JPanel createHeaderBar() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(BG_PAGE);
+
+        // Left Titles
+        JPanel titleBox = new JPanel(new GridLayout(2, 1, 0, 2));
+        titleBox.setBackground(BG_PAGE);
+
+        JLabel title = new JLabel("Habit Tracker");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        title.setForeground(TEXT_DARK);
+
+        String monthYear = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"));
+        JLabel subtitle = new JLabel(monthYear);
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        subtitle.setForeground(TEXT_MUTED);
+
+        titleBox.add(title);
+        titleBox.add(subtitle);
+        header.add(titleBox, BorderLayout.WEST);
+
+        // Right Controls: Profile Badge + Date Navigator + "+ Add Habit" Button
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
+        rightPanel.setBackground(BG_PAGE);
+
+        // User Avatar Badge
+        JPanel userBadge = createUserBadge();
+        rightPanel.add(userBadge);
+
+        // Date Range Selector
+        JPanel dateNav = createDateNavigator();
+        rightPanel.add(dateNav);
+
+        // "+ Add Habit" Button
+        JButton btnAddHabit = new JButton("+ Add Habit") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isPressed()) {
+                    g2.setColor(BRAND_GREEN_DARK);
+                } else if (getModel().isRollover()) {
+                    g2.setColor(new Color(13, 148, 136));
+                } else {
+                    g2.setColor(BRAND_GREEN);
+                }
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btnAddHabit.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btnAddHabit.setForeground(Color.WHITE);
+        btnAddHabit.setContentAreaFilled(false);
+        btnAddHabit.setBorderPainted(false);
+        btnAddHabit.setFocusPainted(false);
+        btnAddHabit.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnAddHabit.setPreferredSize(new Dimension(115, 36));
+        btnAddHabit.addActionListener(e -> showAddHabitDialog());
+
+        rightPanel.add(btnAddHabit);
+        header.add(rightPanel, BorderLayout.EAST);
+
+        return header;
+    }
+
+    private JPanel createUserBadge() {
+        JPanel badge = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        badge.setBackground(CARD_BG);
+        badge.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                new EmptyBorder(2, 6, 2, 10)
+        ));
+
+        String displayName = UserSession.isLoggedIn() ? UserSession.getCurrentUser().getDisplayName() : "Himasai Gandham";
+        String initial = displayName.isEmpty() ? "U" : displayName.substring(0, 1).toUpperCase();
+        String subText = UserSession.isLoggedIn() ? UserSession.getCurrentUser().getEmail() : "View Profile  ⌄";
+
+        // Circular Green Avatar
+        JLabel avatar = new JLabel(initial, SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(BRAND_GREEN);
+                g2.fillOval(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        avatar.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        avatar.setForeground(Color.WHITE);
+        avatar.setPreferredSize(new Dimension(26, 26));
+
+        JPanel nameBox = new JPanel(new GridLayout(2, 1, 0, 0));
+        nameBox.setBackground(CARD_BG);
+
+        JLabel userName = new JLabel(displayName);
+        userName.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        userName.setForeground(TEXT_DARK);
+
+        JLabel userRole = new JLabel(subText);
+        userRole.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        userRole.setForeground(TEXT_MUTED);
+
+        nameBox.add(userName);
+        nameBox.add(userRole);
+
+        badge.add(avatar);
+        badge.add(nameBox);
+        return badge;
+    }
+
+    private JPanel createDateNavigator() {
+        JPanel nav = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 2));
+        nav.setBackground(CARD_BG);
+        nav.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                new EmptyBorder(3, 8, 3, 8)
+        ));
+
+        JButton btnPrev = new JButton("<");
+        styleNavButton(btnPrev);
+        btnPrev.addActionListener(e -> {
+            currentWeekStart = currentWeekStart.minusWeeks(1);
+            updateWeekDisplay();
+        });
+
+        weekRangeLabel = new JLabel(formatWeekRange(currentWeekStart));
+        weekRangeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        weekRangeLabel.setForeground(TEXT_DARK);
+
+        JButton btnNext = new JButton(">");
+        styleNavButton(btnNext);
+        btnNext.addActionListener(e -> {
+            currentWeekStart = currentWeekStart.plusWeeks(1);
+            updateWeekDisplay();
+        });
+
+        nav.add(btnPrev);
+        nav.add(weekRangeLabel);
+        nav.add(btnNext);
+        return nav;
+    }
+
+    private void styleNavButton(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setForeground(TEXT_MUTED);
+        btn.setContentAreaFilled(false);
+        btn.setBorder(null);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    }
+
+    private String formatWeekRange(LocalDate monday) {
+        LocalDate sunday = monday.plusDays(6);
+        DateTimeFormatter mFmt = DateTimeFormatter.ofPattern("MMM d");
+        return monday.format(mFmt) + " - " + sunday.format(mFmt);
+    }
+
+    private void updateWeekDisplay() {
+        weekRangeLabel.setText(formatWeekRange(currentWeekStart));
+        refreshHabitGridRows();
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // FIVE STAT METRIC CARDS ROW (Exact match to screenshot)
+    // ----------------------------------------------------------------------------------------
+    private JPanel createMetricCardsRow() {
+        JPanel cardsRow = new JPanel(new GridLayout(1, 5, 16, 0));
+        cardsRow.setBackground(BG_PAGE);
+        cardsRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 105));
+
+        totalHabitsValue = new JLabel("3");
+        currentStreakValue = new JLabel("0 days");
+        bestStreakValue = new JLabel("3 days");
+        weeklyCompletionValue = new JLabel("0%");
+        overallCompletionValue = new JLabel("14%");
+
+        cardsRow.add(buildStatCard("TOTAL HABITS", totalHabitsValue));
+        cardsRow.add(buildStatCard("CURRENT STREAK", currentStreakValue));
+        cardsRow.add(buildStatCard("BEST STREAK", bestStreakValue));
+        cardsRow.add(buildStatCard("WEEKLY COMPLETION", weeklyCompletionValue));
+        cardsRow.add(buildStatCard("OVERALL COMPLETION", overallCompletionValue));
+
+        return cardsRow;
+    }
+
+    private JPanel buildStatCard(String labelText, JLabel valLabel) {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(CARD_BG);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.setColor(BORDER_COLOR);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        card.setOpaque(false);
+        card.setLayout(new GridLayout(2, 1, 0, 4));
+        card.setBorder(new EmptyBorder(16, 20, 16, 20));
+
+        JLabel title = new JLabel(labelText);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        title.setForeground(TEXT_MUTED);
+
+        valLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        valLabel.setForeground(BRAND_GREEN);
+
+        card.add(title);
+        card.add(valLabel);
+        return card;
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // HABIT GRID CARD (Interactive 7-Day Checklist Matrix)
+    // ----------------------------------------------------------------------------------------
+    private JPanel createHabitGridCard() {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(CARD_BG);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g2.setColor(BORDER_COLOR);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        card.setOpaque(false);
+        card.setLayout(new BorderLayout());
+        card.setBorder(new EmptyBorder(22, 26, 24, 26));
+
+        // Card Header Title
+        JLabel cardTitle = new JLabel("Habit Grid");
+        cardTitle.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        cardTitle.setForeground(TEXT_DARK);
+        cardTitle.setBorder(new EmptyBorder(0, 0, 16, 0));
+        card.add(cardTitle, BorderLayout.NORTH);
+
+        // Container for Column Headers + Habit Rows
+        JPanel tableContainer = new JPanel();
+        tableContainer.setLayout(new BoxLayout(tableContainer, BoxLayout.Y_AXIS));
+        tableContainer.setBackground(CARD_BG);
+
+        // Header Row: "Habit" on left, Mon-Sun dates on right
+        tableContainer.add(createDaysHeaderRow());
+        tableContainer.add(createDividerLine());
+
+        // Dynamic Rows Panel
+        gridRowsPanel = new JPanel();
+        gridRowsPanel.setLayout(new BoxLayout(gridRowsPanel, BoxLayout.Y_AXIS));
+        gridRowsPanel.setBackground(CARD_BG);
+
+        tableContainer.add(gridRowsPanel);
+        card.add(tableContainer, BorderLayout.CENTER);
+
+        refreshHabitGridRows();
+        return card;
+    }
+
+    private JPanel createDaysHeaderRow() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(CARD_BG);
+        header.setBorder(new EmptyBorder(6, 4, 10, 4));
+
+        JLabel habitCol = new JLabel("Habit");
+        habitCol.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        habitCol.setForeground(TEXT_MUTED);
+        header.add(habitCol, BorderLayout.WEST);
+
+        // 7 Day Headers Panel
+        JPanel daysBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
+        daysBox.setBackground(CARD_BG);
+
+        String[] dayNames = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = currentWeekStart.plusDays(i);
+            JPanel dayCell = new JPanel(new GridLayout(2, 1, 0, 1));
+            dayCell.setPreferredSize(new Dimension(32, 34));
+            dayCell.setBackground(CARD_BG);
+
+            JLabel nameLbl = new JLabel(dayNames[i], SwingConstants.CENTER);
+            nameLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            nameLbl.setForeground(TEXT_MUTED);
+
+            JLabel dateLbl = new JLabel(String.valueOf(d.getDayOfMonth()), SwingConstants.CENTER);
+            dateLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            dateLbl.setForeground(TEXT_MUTED);
+
+            dayCell.add(nameLbl);
+            dayCell.add(dateLbl);
+            daysBox.add(dayCell);
+        }
+
+        header.add(daysBox, BorderLayout.EAST);
+        return header;
+    }
+
+    private JComponent createDividerLine() {
+        JSeparator sep = new JSeparator();
+        sep.setForeground(BORDER_COLOR);
+        sep.setBackground(BORDER_COLOR);
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        return sep;
+    }
+
+    private void refreshHabitGridRows() {
+        gridRowsPanel.removeAll();
+
+        for (int i = 0; i < habits.size(); i++) {
+            HabitItem habit = habits.get(i);
+            gridRowsPanel.add(createHabitRow(habit));
+            if (i < habits.size() - 1) {
+                gridRowsPanel.add(createDividerLine());
+            }
+        }
+
+        gridRowsPanel.revalidate();
+        gridRowsPanel.repaint();
+    }
+
+    private JPanel createHabitRow(HabitItem habit) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setBackground(CARD_BG);
+        row.setBorder(new EmptyBorder(14, 4, 14, 4));
+
+        // Left Side: Habit Title & Metadata (e.g. "Health • Daily • From Oct 6")
+        JPanel infoPanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        infoPanel.setBackground(CARD_BG);
+
+        JLabel titleLbl = new JLabel(habit.getTitle());
+        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        titleLbl.setForeground(TEXT_DARK);
+
+        String fromDateStr = habit.getStartDate().format(DateTimeFormatter.ofPattern("MMM d"));
+        JLabel metaLbl = new JLabel(habit.getCategory() + " • " + habit.getFrequency() + " • From " + fromDateStr);
+        metaLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        metaLbl.setForeground(TEXT_MUTED);
+
+        infoPanel.add(titleLbl);
+        infoPanel.add(metaLbl);
+        row.add(infoPanel, BorderLayout.WEST);
+
+        // Right Side: Delete Button "×" + 7 Interactive Rounded Checkboxes
+        JPanel rightBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 4));
+        rightBox.setBackground(CARD_BG);
+
+        // Delete "×" button
+        JButton btnDelete = new JButton("×");
+        btnDelete.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        btnDelete.setForeground(new Color(209, 213, 219));
+        btnDelete.setContentAreaFilled(false);
+        btnDelete.setBorder(null);
+        btnDelete.setFocusPainted(false);
+        btnDelete.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnDelete.setToolTipText("Delete habit");
+        btnDelete.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) { btnDelete.setForeground(DANGER_RED); }
+            @Override
+            public void mouseExited(MouseEvent e) { btnDelete.setForeground(new Color(209, 213, 219)); }
+        });
+        btnDelete.addActionListener(e -> {
+            habits.remove(habit);
+            refreshAllStats();
+            refreshHabitGridRows();
+        });
+
+        rightBox.add(btnDelete);
+
+        // 7 Checkbox Buttons (Mon - Sun)
+        for (int d = 0; d < 7; d++) {
+            LocalDate date = currentWeekStart.plusDays(d);
+            JComponent checkBtn = createCheckboxButton(habit, date);
+            rightBox.add(checkBtn);
+        }
+
+        row.add(rightBox, BorderLayout.EAST);
+        return row;
+    }
+
+    private JComponent createCheckboxButton(HabitItem habit, LocalDate date) {
+        JComponent btn = new JComponent() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                boolean checked = habit.isCompletedOn(date);
+                int w = getWidth() - 2;
+                int h = getHeight() - 2;
+                int arc = 10;
+
+                if (checked) {
+                    // Solid Green Fill
+                    g2.setColor(BRAND_GREEN);
+                    g2.fillRoundRect(1, 1, w, h, arc, arc);
+
+                    // White Checkmark
+                    g2.setColor(Color.WHITE);
+                    g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.drawLine(w / 4 + 1, h / 2, w / 2, (int) (h * 0.72));
+                    g2.drawLine(w / 2, (int) (h * 0.72), (int) (w * 0.78), h / 4 + 1);
+                } else {
+                    // Empty rounded box with soft border
+                    g2.setColor(Color.WHITE);
+                    g2.fillRoundRect(1, 1, w, h, arc, arc);
+                    g2.setColor(BORDER_COLOR);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.drawRoundRect(1, 1, w, h, arc, arc);
+                }
+                g2.dispose();
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(28, 28);
+            }
+        };
+
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                habit.toggleDate(date);
+                btn.repaint();
+                refreshAllStats();
             }
         });
 
         return btn;
     }
 
-    private void filterTable() {
-        String query = searchField.getText().trim();
-        String cat = (String) categoryFilterBox.getSelectedItem();
+    private void refreshAllStats() {
+        int total = habits.size();
+        totalHabitsValue.setText(String.valueOf(total));
 
-        List<RowFilter<HabitTableModel, Integer>> filters = new ArrayList<>();
-        if (!query.isEmpty()) {
-            filters.add(RowFilter.regexFilter("(?i)" + query, 0));
-        }
-        if (cat != null && !cat.equals("All Categories")) {
-            filters.add(RowFilter.regexFilter("(?i)" + cat, 1));
+        int currentStreak = 0;
+        int bestStreak = 0;
+        double sumCompletion = 0;
+
+        for (HabitItem h : habits) {
+            if (h.getCurrentStreak() > currentStreak) currentStreak = h.getCurrentStreak();
+            if (h.getBestStreak() > bestStreak) bestStreak = h.getBestStreak();
+            sumCompletion += h.getCompletionRate();
         }
 
-        if (filters.isEmpty()) {
-            rowSorter.setRowFilter(null);
-        } else {
-            rowSorter.setRowFilter(RowFilter.andFilter(filters));
+        currentStreakValue.setText(currentStreak + " days");
+        bestStreakValue.setText(bestStreak + " days");
+
+        int weeklyCount = 0;
+        for (HabitItem h : habits) {
+            for (int i = 0; i < 7; i++) {
+                if (h.isCompletedOn(currentWeekStart.plusDays(i))) {
+                    weeklyCount++;
+                }
+            }
         }
+        int totalWeeklySlots = Math.max(1, total * 7);
+        int weeklyPct = (weeklyCount * 100) / totalWeeklySlots;
+        weeklyCompletionValue.setText(weeklyPct + "%");
+
+        int overallPct = total > 0 ? (int) Math.round(sumCompletion / total) : 0;
+        overallCompletionValue.setText(overallPct + "%");
     }
 
+    // ----------------------------------------------------------------------------------------
+    // ADD HABIT MODAL DIALOG
+    // ----------------------------------------------------------------------------------------
     private void showAddHabitDialog() {
-        AddHabitDialog dialog = new AddHabitDialog(this);
+        JDialog dialog = new JDialog(this, "Add New Habit", true);
+        dialog.setSize(420, 320);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+
+        JPanel panel = new JPanel(new GridLayout(4, 2, 12, 14));
+        panel.setBackground(CARD_BG);
+        panel.setBorder(new EmptyBorder(24, 28, 24, 28));
+
+        panel.add(new JLabel("Habit Name:"));
+        JTextField nameField = new JTextField("Morning Meditation");
+        panel.add(nameField);
+
+        panel.add(new JLabel("Category:"));
+        JComboBox<String> categoryBox = new JComboBox<>(new String[]{"Health", "Fitness", "Study", "Productivity"});
+        panel.add(categoryBox);
+
+        panel.add(new JLabel("Frequency:"));
+        JComboBox<String> freqBox = new JComboBox<>(new String[]{"Daily", "Weekly"});
+        panel.add(freqBox);
+
+        JButton btnCancel = new JButton("Cancel");
+        btnCancel.addActionListener(e -> dialog.dispose());
+
+        JButton btnSave = new JButton("Save Habit");
+        btnSave.setBackground(BRAND_GREEN);
+        btnSave.setForeground(Color.WHITE);
+        btnSave.setFocusPainted(false);
+        btnSave.addActionListener(e -> {
+            String name = nameField.getText().trim();
+            if (!name.isEmpty()) {
+                HabitItem item = new HabitItem(
+                        System.currentTimeMillis(),
+                        name,
+                        (String) categoryBox.getSelectedItem(),
+                        (String) freqBox.getSelectedItem(),
+                        LocalDate.now(),
+                        0, 0, 0.0
+                );
+                habits.add(item);
+                refreshAllStats();
+                refreshHabitGridRows();
+                dialog.dispose();
+            }
+        });
+
+        panel.add(btnCancel);
+        panel.add(btnSave);
+
+        dialog.setContentPane(panel);
         dialog.setVisible(true);
-
-        HabitItem newHabit = dialog.getCreatedHabit();
-        if (newHabit != null) {
-            habits.add(newHabit);
-            tableModel.fireTableDataChanged();
-            totalCountLabel.setText("Total Habits: " + habits.size() + " | Today: " + LocalDate.now());
-            statusLabel.setText("● Added new habit: " + newHabit.getTitle());
-            heatmapPanel.setSelectedHabit(newHabit);
-        }
-    }
-
-    private void toggleSelectedHabitToday() {
-        int selectedRow = habitTable.getSelectedRow();
-        if (selectedRow < 0) {
-            JOptionPane.showMessageDialog(this, "Please select a habit from the table first.", "No Habit Selected", JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        int modelRow = habitTable.convertRowIndexToModel(selectedRow);
-        HabitItem item = habits.get(modelRow);
-        LocalDate today = LocalDate.now();
-        item.toggleDate(today);
-
-        tableModel.fireTableRowsUpdated(modelRow, modelRow);
-        heatmapPanel.repaint();
-        statusLabel.setText("● Toggled completion for '" + item.getTitle() + "' on " + today);
-    }
-
-    private void deleteSelectedHabit() {
-        int selectedRow = habitTable.getSelectedRow();
-        if (selectedRow < 0) {
-            JOptionPane.showMessageDialog(this, "Please select a habit to delete.", "Notice", JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        int modelRow = habitTable.convertRowIndexToModel(selectedRow);
-        HabitItem item = habits.get(modelRow);
-
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete '" + item.getTitle() + "'?",
-                "Confirm Deletion", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-
-        if (confirm == JOptionPane.YES_OPTION) {
-            habits.remove(modelRow);
-            tableModel.fireTableDataChanged();
-            heatmapPanel.setSelectedHabit(habits.isEmpty() ? null : habits.get(0));
-            totalCountLabel.setText("Total Habits: " + habits.size() + " | Today: " + LocalDate.now());
-            statusLabel.setText("● Deleted habit '" + item.getTitle() + "'");
-        }
     }
 
     private void openAnalyticsDashboard() {
-        SwingUtilities.invokeLater(() -> {
-            HabitAnalyticsDashboardFrame analyticsFrame = new HabitAnalyticsDashboardFrame(habits);
-            analyticsFrame.setVisible(true);
-        });
+        HabitAnalyticsDashboardFrame analytics = new HabitAnalyticsDashboardFrame(habits);
+        analytics.setVisible(true);
     }
 
-    /**
-     * Demonstrates multi-threaded asynchronous data loading using SwingWorker.
-     * Keeps UI responsive while processing background tasks.
-     */
-    private void loadHabitDataAsync() {
-        statusLabel.setText("● Syncing data in background thread (SwingWorker)...");
-        statusLabel.setForeground(WARNING);
-
-        SwingWorker<Void, String> worker = new SwingWorker<>() {
-            @Override
-            protected Void doInBackground() throws Exception {
-                // Simulate network latency / REST API fetch from Spring Boot backend
-                Thread.sleep(600);
-                publish("Connected to backend API. Synced " + habits.size() + " habits.");
-                return null;
-            }
-
-            @Override
-            protected void process(List<String> chunks) {
-                if (!chunks.isEmpty()) {
-                    statusLabel.setText("● " + chunks.get(chunks.size() - 1));
-                }
-            }
-
-            @Override
-            protected void done() {
-                statusLabel.setText("● Synchronized successfully. Real-time updates active.");
-                statusLabel.setForeground(SUCCESS);
-                tableModel.fireTableDataChanged();
-                heatmapPanel.repaint();
-            }
-        };
-
-        worker.execute();
-    }
-
-    // =========================================================================
-    // Custom Swing Component: ActivityHeatmapPanel
-    // =========================================================================
-    public static class ActivityHeatmapPanel extends JPanel {
-        private HabitItem currentHabit;
-        private final int DAYS_TO_SHOW = 30;
-        private final List<LocalDate> dateRange = new ArrayList<>();
-        private int hoveredIndex = -1;
-
-        public ActivityHeatmapPanel(HabitItem habit) {
-            this.currentHabit = habit;
-            setBackground(BG_DARK);
-            setPreferredSize(new Dimension(800, 240));
-
-            LocalDate today = LocalDate.now();
-            for (int i = DAYS_TO_SHOW - 1; i >= 0; i--) {
-                dateRange.add(today.minusDays(i));
-            }
-
-            addMouseMotionListener(new MouseMotionAdapter() {
-                @Override
-                public void mouseMoved(MouseEvent e) {
-                    int oldHover = hoveredIndex;
-                    hoveredIndex = getCellIndexAt(e.getPoint());
-                    if (oldHover != hoveredIndex) {
-                        repaint();
-                        if (hoveredIndex >= 0 && hoveredIndex < dateRange.size() && currentHabit != null) {
-                            LocalDate date = dateRange.get(hoveredIndex);
-                            boolean done = currentHabit.isCompletedOn(date);
-                            setToolTipText(date.format(DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy")) + " — " +
-                                    (done ? "COMPLETED (Tick Active)" : "NOT COMPLETED (Click to toggle)"));
-                        } else {
-                            setToolTipText(null);
-                        }
-                    }
-                }
-            });
-
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (currentHabit != null && hoveredIndex >= 0 && hoveredIndex < dateRange.size()) {
-                        LocalDate date = dateRange.get(hoveredIndex);
-                        currentHabit.toggleDate(date);
-                        repaint();
-                    }
-                }
-
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    hoveredIndex = -1;
-                    repaint();
-                }
-            });
-        }
-
-        public void setSelectedHabit(HabitItem habit) {
-            this.currentHabit = habit;
-            repaint();
-        }
-
-        private int getCellIndexAt(Point p) {
-            int startX = 40;
-            int startY = 85;
-            int cellSize = 28;
-            int gap = 8;
-            int columns = 10;
-
-            for (int i = 0; i < dateRange.size(); i++) {
-                int col = i % columns;
-                int row = i / columns;
-                int x = startX + col * (cellSize + gap);
-                int y = startY + row * (cellSize + gap);
-
-                if (p.x >= x && p.x <= x + cellSize && p.y >= y && p.y <= y + cellSize) {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
-            if (currentHabit == null) {
-                g2.setColor(TEXT_MUTED);
-                g2.setFont(new Font("Segoe UI", Font.ITALIC, 15));
-                g2.drawString("Select a habit from the table above to view its 30-day activity matrix.", 40, 60);
-                g2.dispose();
-                return;
-            }
-
-            // Header info
-            g2.setColor(TEXT_LIGHT);
-            g2.setFont(new Font("Segoe UI", Font.BOLD, 17));
-            g2.drawString("Tracking: " + currentHabit.getTitle(), 40, 35);
-
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            g2.setColor(TEXT_MUTED);
-            g2.drawString("Category: " + currentHabit.getCategory() + "   |   Current Streak: " +
-                    currentHabit.getCurrentStreak() + " days 🔥   |   Best Streak: " + currentHabit.getBestStreak() + " days", 40, 58);
-
-            // Matrix Grid
-            int startX = 40;
-            int startY = 85;
-            int cellSize = 28;
-            int gap = 8;
-            int columns = 10;
-
-            for (int i = 0; i < dateRange.size(); i++) {
-                LocalDate date = dateRange.get(i);
-                int col = i % columns;
-                int row = i / columns;
-                int x = startX + col * (cellSize + gap);
-                int y = startY + row * (cellSize + gap);
-
-                boolean completed = currentHabit.isCompletedOn(date);
-                boolean isToday = date.equals(LocalDate.now());
-                boolean isHovered = (i == hoveredIndex);
-
-                // Cell background
-                if (completed) {
-                    GradientPaint gp = new GradientPaint(x, y, new Color(52, 211, 153), x + cellSize, y + cellSize, SUCCESS);
-                    g2.setPaint(gp);
-                } else {
-                    g2.setColor(new Color(30, 41, 59));
-                }
-
-                RoundRectangle2D cell = new RoundRectangle2D.Float(x, y, cellSize, cellSize, 8, 8);
-                g2.fill(cell);
-
-                // Cell border
-                if (isHovered) {
-                    g2.setColor(Color.WHITE);
-                    g2.setStroke(new BasicStroke(2.0f));
-                    g2.draw(cell);
-                } else if (isToday) {
-                    g2.setColor(WARNING);
-                    g2.setStroke(new BasicStroke(1.8f));
-                    g2.draw(cell);
-                } else {
-                    g2.setColor(BORDER_COLOR);
-                    g2.setStroke(new BasicStroke(1.0f));
-                    g2.draw(cell);
-                }
-
-                // Day number inside cell
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
-                g2.setColor(completed ? Color.BLACK : TEXT_MUTED);
-                String dayStr = String.valueOf(date.getDayOfMonth());
-                FontMetrics fm = g2.getFontMetrics();
-                int tx = x + (cellSize - fm.stringWidth(dayStr)) / 2;
-                int ty = y + ((cellSize - fm.getHeight()) / 2) + fm.getAscent();
-                g2.drawString(dayStr, tx, ty);
-            }
-
-            // Legend on right side
-            int legendX = startX + columns * (cellSize + gap) + 40;
-            int legendY = 95;
-            g2.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            g2.setColor(TEXT_LIGHT);
-            g2.drawString("Matrix Legend", legendX, legendY);
-
-            // Inactive box
-            g2.setColor(new Color(30, 41, 59));
-            g2.fillRoundRect(legendX, legendY + 12, 16, 16, 4, 4);
-            g2.setColor(BORDER_COLOR);
-            g2.drawRoundRect(legendX, legendY + 12, 16, 16, 4, 4);
-            g2.setColor(TEXT_MUTED);
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            g2.drawString("Missed / Unticked", legendX + 24, legendY + 25);
-
-            // Active box
-            g2.setColor(SUCCESS);
-            g2.fillRoundRect(legendX, legendY + 36, 16, 16, 4, 4);
-            g2.setColor(TEXT_MUTED);
-            g2.drawString("Completed (Ticked)", legendX + 24, legendY + 49);
-
-            // Today indicator
-            g2.setColor(WARNING);
-            g2.setStroke(new BasicStroke(1.8f));
-            g2.drawRoundRect(legendX, legendY + 60, 16, 16, 4, 4);
-            g2.setColor(TEXT_MUTED);
-            g2.drawString("Today's Box", legendX + 24, legendY + 73);
-
-            g2.dispose();
-        }
-    }
-
-    // =========================================================================
-    // Custom Table Model: AbstractTableModel implementation
-    // =========================================================================
-    public static class HabitTableModel extends AbstractTableModel {
-        private final String[] columns = {"Habit Name", "Category", "Frequency", "Current Streak", "Completion Rate"};
-        private final List<HabitItem> data;
-
-        public HabitTableModel(List<HabitItem> data) {
-            this.data = data;
-        }
-
-        @Override
-        public int getRowCount() { return data.size(); }
-
-        @Override
-        public int getColumnCount() { return columns.length; }
-
-        @Override
-        public String getColumnName(int col) { return columns[col]; }
-
-        @Override
-        public Object getValueAt(int row, int col) {
-            HabitItem item = data.get(row);
-            switch (col) {
-                case 0: return item.getTitle();
-                case 1: return item.getCategory();
-                case 2: return item.getFrequency();
-                case 3: return item.getCurrentStreak();
-                case 4: return item.getCompletionRate();
-                default: return "";
-            }
-        }
-
-        @Override
-        public Class<?> getColumnClass(int col) {
-            switch (col) {
-                case 3: return Integer.class;
-                case 4: return Double.class;
-                default: return String.class;
-            }
-        }
-    }
-
-    // =========================================================================
-    // Custom Table Cell Renderers
-    // =========================================================================
-    public static class CategoryBadgeRenderer extends DefaultTableCellRenderer {
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object val, boolean isSel, boolean hasFocus, int r, int c) {
-            JLabel lbl = (JLabel) super.getTableCellRendererComponent(table, val, isSel, hasFocus, r, c);
-            lbl.setHorizontalAlignment(SwingConstants.CENTER);
-            lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
-
-            String text = val != null ? val.toString() : "";
-            lbl.setText(text);
-
-            if (!isSel) {
-                lbl.setBackground(new Color(51, 65, 85));
-                lbl.setForeground(new Color(199, 210, 254));
-                lbl.setBorder(new EmptyBorder(2, 8, 2, 8));
-            }
-            return lbl;
-        }
-    }
-
-    public static class StreakCellRenderer extends DefaultTableCellRenderer {
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object val, boolean isSel, boolean hasFocus, int r, int c) {
-            JLabel lbl = (JLabel) super.getTableCellRendererComponent(table, val, isSel, hasFocus, r, c);
-            int streak = val instanceof Integer ? (Integer) val : 0;
-            lbl.setText(streak + " days " + (streak >= 5 ? "🔥" : "⚡"));
-            lbl.setHorizontalAlignment(SwingConstants.CENTER);
-            lbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
-            if (!isSel) {
-                lbl.setForeground(streak >= 5 ? new Color(251, 146, 60) : TEXT_LIGHT);
-            }
-            return lbl;
-        }
-    }
-
-    public static class ProgressBarCellRenderer extends DefaultTableCellRenderer {
-        private final JProgressBar progressBar = new JProgressBar(0, 100);
-
-        public ProgressBarCellRenderer() {
-            progressBar.setStringPainted(true);
-            progressBar.setFont(new Font("Segoe UI", Font.BOLD, 11));
-            progressBar.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-            progressBar.setBackground(new Color(30, 41, 59));
-        }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object val, boolean isSel, boolean hasFocus, int r, int c) {
-            double rate = val instanceof Double ? (Double) val : 0.0;
-            int intVal = (int) Math.round(rate);
-            progressBar.setValue(intVal);
-            progressBar.setString(intVal + "%");
-
-            if (intVal >= 80) progressBar.setForeground(SUCCESS);
-            else if (intVal >= 50) progressBar.setForeground(WARNING);
-            else progressBar.setForeground(DANGER);
-
-            return progressBar;
-        }
-    }
-
-    // =========================================================================
-    // Custom Modal Dialog: AddHabitDialog with GridBagLayout
-    // =========================================================================
-    public static class AddHabitDialog extends JDialog {
-        private HabitItem createdHabit = null;
-        private final JTextField titleField;
-        private final JComboBox<String> categoryBox;
-        private final JRadioButton dailyRadio;
-        private final JRadioButton weeklyRadio;
-
-        public AddHabitDialog(JFrame parent) {
-            super(parent, "Add New ProgressGrid Activity / Habit", true);
-            setSize(460, 360);
-            setLocationRelativeTo(parent);
-            setResizable(false);
-
-            JPanel panel = new JPanel(new GridBagLayout());
-            panel.setBackground(CARD_BG);
-            panel.setBorder(new EmptyBorder(20, 24, 20, 24));
-
-            GridBagConstraints gbc = new GridBagConstraints();
-            gbc.insets = new Insets(8, 8, 8, 8);
-            gbc.fill = GridBagConstraints.HORIZONTAL;
-
-            // Header
-            JLabel header = new JLabel("Create a New Activity");
-            header.setFont(new Font("Segoe UI", Font.BOLD, 18));
-            header.setForeground(TEXT_LIGHT);
-            gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
-            panel.add(header, gbc);
-
-            // Title
-            gbc.gridwidth = 1;
-            gbc.gridx = 0; gbc.gridy = 1;
-            JLabel titleLbl = new JLabel("Habit Title:");
-            titleLbl.setForeground(TEXT_LIGHT);
-            panel.add(titleLbl, gbc);
-
-            gbc.gridx = 1;
-            titleField = new JTextField(15);
-            titleField.setPreferredSize(new Dimension(200, 30));
-            titleField.setBackground(BG_DARK);
-            titleField.setForeground(TEXT_LIGHT);
-            titleField.setCaretColor(TEXT_LIGHT);
-            panel.add(titleField, gbc);
-
-            // Category
-            gbc.gridx = 0; gbc.gridy = 2;
-            JLabel catLbl = new JLabel("Category:");
-            catLbl.setForeground(TEXT_LIGHT);
-            panel.add(catLbl, gbc);
-
-            gbc.gridx = 1;
-            categoryBox = new JComboBox<>(new String[]{"Development", "Learning", "Fitness", "Education", "Health", "Academics", "Personal"});
-            categoryBox.setBackground(BG_DARK);
-            categoryBox.setForeground(TEXT_LIGHT);
-            panel.add(categoryBox, gbc);
-
-            // Frequency
-            gbc.gridx = 0; gbc.gridy = 3;
-            JLabel freqLbl = new JLabel("Frequency:");
-            freqLbl.setForeground(TEXT_LIGHT);
-            panel.add(freqLbl, gbc);
-
-            gbc.gridx = 1;
-            JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-            radioPanel.setBackground(CARD_BG);
-            dailyRadio = new JRadioButton("Daily", true);
-            weeklyRadio = new JRadioButton("Weekly");
-            dailyRadio.setBackground(CARD_BG);
-            dailyRadio.setForeground(TEXT_LIGHT);
-            weeklyRadio.setBackground(CARD_BG);
-            weeklyRadio.setForeground(TEXT_LIGHT);
-
-            ButtonGroup bg = new ButtonGroup();
-            bg.add(dailyRadio);
-            bg.add(weeklyRadio);
-            radioPanel.add(dailyRadio);
-            radioPanel.add(weeklyRadio);
-            panel.add(radioPanel, gbc);
-
-            // Buttons
-            gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
-            gbc.insets = new Insets(20, 8, 8, 8);
-            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-            btnPanel.setBackground(CARD_BG);
-
-            JButton cancelBtn = new JButton("Cancel");
-            cancelBtn.setBackground(new Color(51, 65, 85));
-            cancelBtn.setForeground(TEXT_LIGHT);
-            cancelBtn.addActionListener(e -> dispose());
-
-            JButton saveBtn = new JButton("Save Activity");
-            saveBtn.setBackground(PRIMARY);
-            saveBtn.setForeground(Color.WHITE);
-            saveBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-            saveBtn.addActionListener(e -> {
-                String title = titleField.getText().trim();
-                if (title.isEmpty()) {
-                    JOptionPane.showMessageDialog(this, "Please enter a habit title.", "Validation Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-                String cat = (String) categoryBox.getSelectedItem();
-                String freq = dailyRadio.isSelected() ? "DAILY" : "WEEKLY";
-                long id = System.currentTimeMillis();
-
-                createdHabit = new HabitItem(id, title, cat, freq, 0, 0, 0.0);
-                dispose();
-            });
-
-            btnPanel.add(cancelBtn);
-            btnPanel.add(saveBtn);
-            panel.add(btnPanel, gbc);
-
-            setContentPane(panel);
-        }
-
-        public HabitItem getCreatedHabit() {
-            return createdHabit;
-        }
-    }
-
-    // =========================================================================
-    // Independent Main Entry Point
-    // =========================================================================
     public static void main(String[] args) {
-        // Set System Look & Feel
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {}
-
         SwingUtilities.invokeLater(() -> {
             HabitProgressGridFrame frame = new HabitProgressGridFrame();
             frame.setVisible(true);

@@ -18,18 +18,29 @@ import java.util.*;
 import java.util.List;
 
 /**
- * HabitAnalyticsDashboardFrame - Advanced Visual Progress Visualization & Analytics Dashboard.
+ * HabitAnalyticsDashboardFrame - Advanced Visual Progress Visualization &
+ * Analytics Dashboard.
  * 
  * Demonstrates complex Java Swing concepts:
- * 1. Custom 2D Graphics Data Visualizations (Graphics2D, RenderingHints, GradientPaint, Arc2D, Path2D)
+ * 1. Custom 2D Graphics Data Visualizations (Graphics2D, RenderingHints,
+ * GradientPaint, Arc2D, Path2D)
  * 2. Custom Radial Gauge (Circular Progress Indicator for Daily Progress)
  * 3. Custom Bar Chart with Hover Tooltips (Weekly Progress Bar Graph)
  * 4. Custom Polyline & Area Trend Chart (Monthly Consistency & Streak Graph)
  * 5. Custom Donut Chart (Category Distribution Breakdown)
- * 6. Smooth Animation Timers (javax.swing.Timer for 60fps easing progress fills)
+ * 6. Smooth Animation Timers (javax.swing.Timer for 60fps easing progress
+ * fills)
  * 7. File Chooser Dialog (JFileChooser for CSV / Report Export)
- * 8. Compound Layout Management (BorderLayout, GridLayout, GridBagLayout, JTabbedPane)
+ * 8. Compound Layout Management (BorderLayout, GridLayout, GridBagLayout,
+ * JTabbedPane)
  */
+// ============================================================================================
+// [SWING - JFRAME]: Top-Level Analytics Dashboard Window Container
+// HabitAnalyticsDashboardFrame extends JFrame to provide the visual analytics
+// window,
+// OS title bar, window controls, and hosting container for custom charts and
+// KPI cards.
+// ============================================================================================
 public class HabitAnalyticsDashboardFrame extends JFrame {
 
     // Themes & Colors
@@ -46,45 +57,76 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
     public static final Color BORDER_COLOR = new Color(51, 65, 85);
 
     private final List<HabitProgressGridFrame.HabitItem> habits;
+
+    // ========================================================================================
+    // [SWING CUSTOM COMPONENTS & LABELS]: Chart Panels and KPI Metric Displays
+    // ========================================================================================
+    // [SWING CUSTOM PANELS]: 4 Custom JPanel classes with 2D rendering and
+    // animation timers
     private CircularGaugePanel dailyGauge;
     private WeeklyBarChartPanel weeklyChart;
     private MonthlyTrendPanel trendChart;
     private CategoryDonutPanel donutChart;
+
+    // [SWING LABELS]: Dynamic KPI numerical readouts
     private JLabel statTotalHabits;
     private JLabel statTodayRate;
     private JLabel statBestStreak;
     private JLabel statWeeklyScore;
 
+    // ========================================================================================
+    // [SWING - JFRAME CONSTRUCTOR]: Window Dimensions, Positioning, and
+    // Initialization
+    // ========================================================================================
     public HabitAnalyticsDashboardFrame(List<HabitProgressGridFrame.HabitItem> habitList) {
         this.habits = (habitList != null && !habitList.isEmpty()) ? habitList : createDefaultHabitData();
 
+        // [JFRAME METHOD]: Set the title text for the desktop window
         setTitle("ProgressGrid — Visual Progress & Habit Analytics Dashboard");
+
+        // [JFRAME METHOD]: Set default dimensions (width: 1150px, height: 820px)
         setSize(1150, 820);
+
+        // [JFRAME METHOD]: Set minimum resizing limits
         setMinimumSize(new Dimension(980, 650));
+
+        // [JFRAME METHOD]: Center JFrame in the center of the display screen
         setLocationRelativeTo(null);
+
+        // [JFRAME METHOD]: Dispose window and free graphics resources on close
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        setupUI();
-        triggerAnimations();
+        setupUI(); // [SWING]: Assemble layout and component hierarchy
+        triggerAnimations(); // [SWING]: Launch javax.swing.Timer animations for all charts
     }
 
     private List<HabitProgressGridFrame.HabitItem> createDefaultHabitData() {
         List<HabitProgressGridFrame.HabitItem> list = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
-        HabitProgressGridFrame.HabitItem h1 = new HabitProgressGridFrame.HabitItem(1, "Coding & DSA", "Development", "DAILY", 7, 14, 85.0);
-        HabitProgressGridFrame.HabitItem h2 = new HabitProgressGridFrame.HabitItem(2, "Tech Reading", "Learning", "DAILY", 4, 10, 72.0);
-        HabitProgressGridFrame.HabitItem h3 = new HabitProgressGridFrame.HabitItem(3, "Gym / Fitness", "Fitness", "DAILY", 12, 18, 90.0);
-        HabitProgressGridFrame.HabitItem h4 = new HabitProgressGridFrame.HabitItem(4, "System Design", "Education", "WEEKLY", 3, 5, 60.0);
-        HabitProgressGridFrame.HabitItem h5 = new HabitProgressGridFrame.HabitItem(5, "Drink 3L Water", "Health", "DAILY", 15, 15, 95.0);
+        HabitProgressGridFrame.HabitItem h1 = new HabitProgressGridFrame.HabitItem(1, "Coding & DSA", "Development",
+                "DAILY", 7, 14, 85.0);
+        HabitProgressGridFrame.HabitItem h2 = new HabitProgressGridFrame.HabitItem(2, "Tech Reading", "Learning",
+                "DAILY", 4, 10, 72.0);
+        HabitProgressGridFrame.HabitItem h3 = new HabitProgressGridFrame.HabitItem(3, "Gym / Fitness", "Fitness",
+                "DAILY", 12, 18, 90.0);
+        HabitProgressGridFrame.HabitItem h4 = new HabitProgressGridFrame.HabitItem(4, "System Design", "Education",
+                "WEEKLY", 3, 5, 60.0);
+        HabitProgressGridFrame.HabitItem h5 = new HabitProgressGridFrame.HabitItem(5, "Drink 3L Water", "Health",
+                "DAILY", 15, 15, 95.0);
 
         for (int i = 0; i < 30; i++) {
             LocalDate d = today.minusDays(i);
-            if (i % 2 == 0) h1.getCompletionDates().add(d);
-            if (i % 3 != 0) h2.getCompletionDates().add(d);
-            if (i < 12 || i % 4 == 0) h3.getCompletionDates().add(d);
-            if (i % 7 == 0) h4.getCompletionDates().add(d);
-            if (i < 15) h5.getCompletionDates().add(d);
+            if (i % 2 == 0)
+                h1.getCompletionDates().add(d);
+            if (i % 3 != 0)
+                h2.getCompletionDates().add(d);
+            if (i < 12 || i % 4 == 0)
+                h3.getCompletionDates().add(d);
+            if (i % 7 == 0)
+                h4.getCompletionDates().add(d);
+            if (i < 15)
+                h5.getCompletionDates().add(d);
         }
 
         list.add(h1);
@@ -96,26 +138,29 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
     }
 
     private void setupUI() {
+        // [SWING CONTAINER]: Root JPanel with BorderLayout
         JPanel root = new JPanel(new BorderLayout(0, 0));
         root.setBackground(BG_DARK);
 
-        // 1. Header with Title & Action Controls
+        // 1. [SWING CONTAINER]: Header Toolbar Panel placed at BorderLayout.NORTH
         JPanel topBar = createHeaderBar();
         root.add(topBar, BorderLayout.NORTH);
 
-        // 2. Main Content Container
+        // 2. [SWING CONTAINER]: Main Content Container with vertical spacing
         JPanel mainContent = new JPanel(new BorderLayout(0, 16));
         mainContent.setBackground(BG_DARK);
         mainContent.setBorder(new EmptyBorder(12, 18, 16, 18));
 
-        // KPI Summary Cards
+        // [SWING CONTAINER]: KPI Summary Cards Panel (1 Row x 4 Columns GridLayout)
         JPanel kpiPanel = createKpiCardsPanel();
         mainContent.add(kpiPanel, BorderLayout.NORTH);
 
-        // Charts Grid (2x2 layout for 4 custom data visualizers)
+        // [SWING CONTAINER]: Charts Grid Panel (2 Rows x 2 Columns GridLayout for 4
+        // custom visualizers)
         JPanel chartsGrid = new JPanel(new GridLayout(2, 2, 16, 16));
         chartsGrid.setBackground(BG_DARK);
 
+        // [SWING CUSTOM COMPONENTS]: Instantiate 4 custom animated chart panels
         dailyGauge = new CircularGaugePanel(calculateDailyCompletionPercentage());
         weeklyChart = new WeeklyBarChartPanel(calculateWeeklyCompletion());
         trendChart = new MonthlyTrendPanel(calculateMonthlyTrend());
@@ -128,26 +173,35 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
 
         mainContent.add(chartsGrid, BorderLayout.CENTER);
 
+        // [SWING CONTAINER]: JScrollPane for smooth scrolling across various monitor
+        // resolutions
         JScrollPane scrollPane = new JScrollPane(mainContent);
         scrollPane.setBorder(null);
         scrollPane.getViewport().setBackground(BG_DARK);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16); // Smooth scrolling speed
 
         root.add(scrollPane, BorderLayout.CENTER);
+
+        // [JFRAME METHOD]: Set root JPanel as the content pane for this JFrame
         setContentPane(root);
     }
 
+    // ========================================================================================
+    // [SWING - HEADER & CONTROLS]: Header Toolbar, JButtons, and ActionListeners
+    // ========================================================================================
     private JPanel createHeaderBar() {
+        // [SWING CONTAINER]: Header panel with BorderLayout
         JPanel header = new JPanel(new BorderLayout(15, 0));
         header.setBackground(CARD_BG);
         header.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
-                new EmptyBorder(12, 20, 12, 20)
-        ));
+                new EmptyBorder(12, 20, 12, 20)));
 
+        // [SWING CONTAINER]: Branding panel on left using FlowLayout
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setBackground(CARD_BG);
 
+        // [SWING COMPONENT]: JLabels for branding and titles
         JLabel icon = new JLabel("📈");
         icon.setFont(new Font("Segoe UI", Font.PLAIN, 22));
 
@@ -163,25 +217,29 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         left.add(title);
         left.add(subtitle);
 
+        // [SWING CONTAINER]: Actions panel on right using FlowLayout
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setBackground(CARD_BG);
 
+        // [SWING COMPONENT]: JButton to re-trigger chart animations
         JButton replayBtn = new JButton("↻ Animate Charts");
         replayBtn.setBackground(new Color(51, 65, 85));
         replayBtn.setForeground(TEXT_LIGHT);
         replayBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         replayBtn.setFocusPainted(false);
         replayBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        replayBtn.addActionListener(e -> triggerAnimations());
+        replayBtn.addActionListener(e -> triggerAnimations()); // [SWING EVENT]: Replays chart animations
 
+        // [SWING COMPONENT]: JButton to export report using JFileChooser
         JButton exportBtn = new JButton("📥 Export Report");
         exportBtn.setBackground(PRIMARY);
         exportBtn.setForeground(Color.WHITE);
         exportBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         exportBtn.setFocusPainted(false);
         exportBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        exportBtn.addActionListener(e -> exportReportToFile());
+        exportBtn.addActionListener(e -> exportReportToFile()); // [SWING EVENT]: Opens JFileChooser
 
+        // [SWING COMPONENT]: JButton to open the main HabitProgressGridFrame (JFrame)
         JButton openGridBtn = new JButton("▦ Open Habit Grid");
         openGridBtn.setBackground(SUCCESS);
         openGridBtn.setForeground(Color.WHITE);
@@ -189,9 +247,10 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         openGridBtn.setFocusPainted(false);
         openGridBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         openGridBtn.addActionListener(e -> {
+            // [SWING THREAD SAFETY & JFRAME]: Safely open HabitProgressGridFrame on EDT
             SwingUtilities.invokeLater(() -> {
-                HabitProgressGridFrame grid = new HabitProgressGridFrame();
-                grid.setVisible(true);
+                HabitProgressGridFrame grid = new HabitProgressGridFrame(); // [SWING - JFRAME]
+                grid.setVisible(true); // Display JFrame
             });
         });
 
@@ -204,7 +263,12 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         return header;
     }
 
+    // ========================================================================================
+    // [SWING - KPI CARDS & GRIDLAYOUT]: Structured Metric Display
+    // ========================================================================================
     private JPanel createKpiCardsPanel() {
+        // [SWING CONTAINER & LAYOUT]: 1 row x 4 columns GridLayout with 14px horizontal
+        // gaps
         JPanel panel = new JPanel(new GridLayout(1, 4, 14, 0));
         panel.setBackground(BG_DARK);
 
@@ -213,6 +277,7 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         int bestStreak = habits.stream().mapToInt(HabitProgressGridFrame.HabitItem::getBestStreak).max().orElse(0);
         int weeklyScore = (int) Math.round(calculateWeeklyAverageScore());
 
+        // [SWING COMPONENT]: JLabels for KPI metrics
         statTotalHabits = new JLabel(String.valueOf(total));
         statTodayRate = new JLabel(todayPercent + "%");
         statBestStreak = new JLabel(bestStreak + " days");
@@ -227,12 +292,12 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
     }
 
     private JPanel createKpiCard(String label, JLabel valueLabel, String subtitle, Color accentColor) {
+        // [SWING CONTAINER]: Individual KPI card panel with custom accent border
         JPanel card = new JPanel(new BorderLayout(0, 4));
         card.setBackground(CARD_BG);
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 4, 0, 0, accentColor),
-                new EmptyBorder(12, 14, 12, 14)
-        ));
+                new EmptyBorder(12, 14, 12, 14)));
 
         JLabel titleLbl = new JLabel(label);
         titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 11));
@@ -253,12 +318,12 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
     }
 
     private JPanel createChartCard(String title, JComponent chart) {
+        // [SWING CONTAINER]: Container card panel wrapping each custom chart component
         JPanel card = new JPanel(new BorderLayout(0, 8));
         card.setBackground(CARD_BG);
         card.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(12, 14, 12, 14)
-        ));
+                new EmptyBorder(12, 14, 12, 14)));
 
         JLabel header = new JLabel(title);
         header.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -269,6 +334,10 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         return card;
     }
 
+    // ========================================================================================
+    // [SWING - ANIMATION TRIGGERS]: Dispatching Animations across all 4 Custom
+    // Chart Panels
+    // ========================================================================================
     private void triggerAnimations() {
         dailyGauge.startAnimation();
         weeklyChart.startAnimation();
@@ -276,12 +345,19 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         donutChart.startAnimation();
     }
 
+    // ========================================================================================
+    // [SWING - FILE CHOOSER & DIALOGS]: JFileChooser and JOptionPane
+    // ========================================================================================
     private void exportReportToFile() {
+        // [SWING COMPONENT]: JFileChooser creates a native OS file save dialog
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Save ProgressGrid Habit Analytics Report");
         fileChooser.setSelectedFile(new File("ProgressGrid_Analytics_Report_" + LocalDate.now() + ".csv"));
+
+        // [SWING FILTER]: FileNameExtensionFilter restricts or hints file extension
         fileChooser.setFileFilter(new FileNameExtensionFilter("CSV Comma Delimited (*.csv)", "csv"));
 
+        // [SWING DIALOG]: Show save dialog with this JFrame as parent
         int userSelection = fileChooser.showSaveDialog(this);
         if (userSelection == JFileChooser.APPROVE_OPTION) {
             File fileToSave = fileChooser.getSelectedFile();
@@ -293,7 +369,8 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
                 writer.println("ProgressGrid Habit Performance & Analytics Report");
                 writer.println("Generated Date," + LocalDate.now());
                 writer.println("Total Tracked Habits," + habits.size());
-                writer.println("Today Completion Rate," + String.format(Locale.US, "%.1f%%", calculateDailyCompletionPercentage()));
+                writer.println("Today Completion Rate,"
+                        + String.format(Locale.US, "%.1f%%", calculateDailyCompletionPercentage()));
                 writer.println();
                 writer.println("Habit Name,Category,Frequency,Current Streak,Best Streak,Completion Rate %");
 
@@ -303,10 +380,12 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
                             h.getCurrentStreak(), h.getBestStreak(), h.getCompletionRate());
                 }
 
+                // [SWING DIALOG]: JOptionPane success message popup
                 JOptionPane.showMessageDialog(this,
                         "Report successfully exported to:\n" + fileToSave.getAbsolutePath(),
                         "Export Successful", JOptionPane.INFORMATION_MESSAGE);
             } catch (Exception ex) {
+                // [SWING DIALOG]: JOptionPane error message popup
                 JOptionPane.showMessageDialog(this,
                         "Failed to export report: " + ex.getMessage(),
                         "Export Error", JOptionPane.ERROR_MESSAGE);
@@ -316,7 +395,8 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
 
     // Calculations
     private double calculateDailyCompletionPercentage() {
-        if (habits.isEmpty()) return 0.0;
+        if (habits.isEmpty())
+            return 0.0;
         LocalDate today = LocalDate.now();
         long completed = habits.stream().filter(h -> h.isCompletedOn(today)).count();
         return (completed * 100.0) / habits.size();
@@ -324,7 +404,8 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
 
     private double[] calculateWeeklyCompletion() {
         double[] days = new double[7]; // Monday to Sunday
-        if (habits.isEmpty()) return days;
+        if (habits.isEmpty())
+            return days;
 
         LocalDate today = LocalDate.now();
         LocalDate monday = today.with(DayOfWeek.MONDAY);
@@ -340,13 +421,15 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
     private double calculateWeeklyAverageScore() {
         double[] week = calculateWeeklyCompletion();
         double sum = 0;
-        for (double v : week) sum += v;
+        for (double v : week)
+            sum += v;
         return sum / 7.0;
     }
 
     private double[] calculateMonthlyTrend() {
         double[] points = new double[30];
-        if (habits.isEmpty()) return points;
+        if (habits.isEmpty())
+            return points;
 
         LocalDate today = LocalDate.now();
         for (int i = 0; i < 30; i++) {
@@ -365,23 +448,30 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         return map;
     }
 
-    // =========================================================================
-    // Visual Component 1: Circular Progress Gauge (Daily Progress)
-    // =========================================================================
+    // ========================================================================================
+    // [SWING - CUSTOM COMPONENT 1]: Circular Gauge Panel (Radial Daily Progress)
+    // Demonstrates custom JPanel 2D graphics rendering with javax.swing.Timer 60fps
+    // easing.
+    // ========================================================================================
     public static class CircularGaugePanel extends JPanel {
         private final double targetPercentage;
         private double animatedPercentage = 0.0;
+
+        // [SWING ANIMATION TIMER]: javax.swing.Timer for smooth animation loop on the
+        // EDT
         private javax.swing.Timer timer;
 
         public CircularGaugePanel(double targetPercentage) {
             this.targetPercentage = targetPercentage;
             setBackground(CARD_BG);
-            setPreferredSize(new Dimension(280, 220));
+            setPreferredSize(new Dimension(280, 220)); // [SWING COMPONENT]: Preferred dimensions
         }
 
         public void startAnimation() {
-            if (timer != null && timer.isRunning()) timer.stop();
+            if (timer != null && timer.isRunning())
+                timer.stop();
             animatedPercentage = 0.0;
+            // [SWING TIMER]: 16ms delay (~60 FPS) with ActionListener executing on EDT
             timer = new javax.swing.Timer(16, new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
                     if (animatedPercentage < targetPercentage) {
@@ -390,7 +480,7 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
                             animatedPercentage = targetPercentage;
                             timer.stop();
                         }
-                        repaint();
+                        repaint(); // [SWING REPAINT]: Request frame repaint on EDT
                     } else {
                         timer.stop();
                     }
@@ -399,11 +489,14 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
             timer.start();
         }
 
+        // [SWING 2D PAINTING]: Custom rendering with Graphics2D and Arc2D
         @Override
         protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
+            super.paintComponent(g); // Always clear background
             Graphics2D g2 = (Graphics2D) g.create();
+            // Antialiasing for smooth vector arcs and typography
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
             int width = getWidth();
             int height = getHeight();
@@ -416,13 +509,15 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
             // Background Track
             g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.setColor(new Color(51, 65, 85, 120));
-            g2.draw(new Arc2D.Double(x + strokeWidth / 2.0, y + strokeWidth / 2.0, size - strokeWidth, size - strokeWidth, 0, 360, Arc2D.OPEN));
+            g2.draw(new Arc2D.Double(x + strokeWidth / 2.0, y + strokeWidth / 2.0, size - strokeWidth,
+                    size - strokeWidth, 0, 360, Arc2D.OPEN));
 
-            // Animated Foreground Arc
+            // Animated Foreground Arc with GradientPaint
             double extent = -(animatedPercentage / 100.0) * 360.0;
             GradientPaint gradient = new GradientPaint(x, y, new Color(52, 211, 153), x + size, y + size, PRIMARY);
             g2.setPaint(gradient);
-            g2.draw(new Arc2D.Double(x + strokeWidth / 2.0, y + strokeWidth / 2.0, size - strokeWidth, size - strokeWidth, 90, extent, Arc2D.OPEN));
+            g2.draw(new Arc2D.Double(x + strokeWidth / 2.0, y + strokeWidth / 2.0, size - strokeWidth,
+                    size - strokeWidth, 90, extent, Arc2D.OPEN));
 
             // Center Text
             g2.setColor(TEXT_LIGHT);
@@ -443,14 +538,16 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
     }
 
-    // =========================================================================
-    // Visual Component 2: Weekly Bar Chart
-    // =========================================================================
+    // ========================================================================================
+    // [SWING - CUSTOM COMPONENT 2]: Weekly Bar Chart Panel (7-Day Performance)
+    // Custom JPanel with mouse hover detection, dynamic tooltips, and bar
+    // animations.
+    // ========================================================================================
     public static class WeeklyBarChartPanel extends JPanel {
         private final double[] values;
         private double animProgress = 0.0;
-        private javax.swing.Timer timer;
-        private final String[] days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        private javax.swing.Timer timer; // [SWING ANIMATION TIMER]
+        private final String[] days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
         private int hoveredBar = -1;
 
         public WeeklyBarChartPanel(double[] values) {
@@ -458,15 +555,18 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
             setBackground(CARD_BG);
             setPreferredSize(new Dimension(280, 220));
 
+            // [SWING EVENT]: MouseMotionListener for bar hover detection and tooltip update
             addMouseMotionListener(new MouseMotionAdapter() {
                 @Override
                 public void mouseMoved(MouseEvent e) {
                     int old = hoveredBar;
                     hoveredBar = getBarAt(e.getX(), e.getY());
                     if (old != hoveredBar) {
-                        repaint();
+                        repaint(); // [SWING REPAINT]: Repaint on hover state change
                         if (hoveredBar >= 0 && hoveredBar < values.length) {
-                            setToolTipText(days[hoveredBar] + ": " + String.format(Locale.US, "%.1f%% completed", values[hoveredBar]));
+                            // [SWING TOOLTIP]: Dynamic tooltip with precise metric value
+                            setToolTipText(days[hoveredBar] + ": "
+                                    + String.format(Locale.US, "%.1f%% completed", values[hoveredBar]));
                         } else {
                             setToolTipText(null);
                         }
@@ -491,19 +591,22 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
 
         public void startAnimation() {
-            if (timer != null && timer.isRunning()) timer.stop();
+            if (timer != null && timer.isRunning())
+                timer.stop();
             animProgress = 0.0;
+            // [SWING TIMER]: 16ms animation step
             timer = new javax.swing.Timer(16, e -> {
                 animProgress += 0.05;
                 if (animProgress >= 1.0) {
                     animProgress = 1.0;
                     timer.stop();
                 }
-                repaint();
+                repaint(); // [SWING REPAINT]
             });
             timer.start();
         }
 
+        // [SWING 2D PAINTING]: Custom paintComponent for bar visualization
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -518,7 +621,8 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
 
             // Grid lines (0%, 50%, 100%)
             g2.setColor(new Color(51, 65, 85, 100));
-            g2.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{4, 4}, 0));
+            g2.setStroke(
+                    new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] { 4, 4 }, 0));
             g2.drawLine(startX, baselineY, startX + width, baselineY);
             g2.drawLine(startX, baselineY - height / 2, startX + width, baselineY - height / 2);
             g2.drawLine(startX, startY, startX + width, startY);
@@ -559,13 +663,15 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
     }
 
-    // =========================================================================
-    // Visual Component 3: 30-Day Monthly Trend Chart
-    // =========================================================================
+    // ========================================================================================
+    // [SWING - CUSTOM COMPONENT 3]: Monthly Trend Panel (Path2D Vector Polyline &
+    // Area Chart)
+    // Custom JPanel rendering 30-day consistency spline and area gradient.
+    // ========================================================================================
     public static class MonthlyTrendPanel extends JPanel {
         private final double[] values;
         private double animProgress = 0.0;
-        private javax.swing.Timer timer;
+        private javax.swing.Timer timer; // [SWING ANIMATION TIMER]
 
         public MonthlyTrendPanel(double[] values) {
             this.values = values;
@@ -574,19 +680,22 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
 
         public void startAnimation() {
-            if (timer != null && timer.isRunning()) timer.stop();
+            if (timer != null && timer.isRunning())
+                timer.stop();
             animProgress = 0.0;
+            // [SWING TIMER]: 16ms animation interval
             timer = new javax.swing.Timer(16, e -> {
                 animProgress += 0.04;
                 if (animProgress >= 1.0) {
                     animProgress = 1.0;
                     timer.stop();
                 }
-                repaint();
+                repaint(); // [SWING REPAINT]
             });
             timer.start();
         }
 
+        // [SWING 2D PAINTING]: Custom Path2D vector drawing inside paintComponent()
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -632,7 +741,7 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
             areaPath.lineTo(startX + width, baselineY);
             areaPath.closePath();
 
-            // Draw Area Fill
+            // Draw Area Fill with GradientPaint
             GradientPaint areaPaint = new GradientPaint(startX, startY, new Color(79, 70, 229, 90),
                     startX, baselineY, new Color(79, 70, 229, 5));
             g2.setPaint(areaPaint);
@@ -658,13 +767,16 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
     }
 
-    // =========================================================================
-    // Visual Component 4: Category Donut Chart
-    // =========================================================================
+    // ========================================================================================
+    // [SWING - CUSTOM COMPONENT 4]: Category Donut Panel (Category Breakdown
+    // Pie/Donut Chart)
+    // Custom JPanel rendering animated radial slices using Arc2D.PIE and hollow
+    // center hole.
+    // ========================================================================================
     public static class CategoryDonutPanel extends JPanel {
         private final Map<String, Integer> distribution;
         private double animAngle = 0.0;
-        private javax.swing.Timer timer;
+        private javax.swing.Timer timer; // [SWING ANIMATION TIMER]
         private final Color[] sliceColors = {
                 new Color(79, 70, 229),
                 new Color(16, 185, 129),
@@ -681,19 +793,22 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
 
         public void startAnimation() {
-            if (timer != null && timer.isRunning()) timer.stop();
+            if (timer != null && timer.isRunning())
+                timer.stop();
             animAngle = 0.0;
+            // [SWING TIMER]: 16ms animation rotation
             timer = new javax.swing.Timer(16, e -> {
                 animAngle += 12.0;
                 if (animAngle >= 360.0) {
                     animAngle = 360.0;
                     timer.stop();
                 }
-                repaint();
+                repaint(); // [SWING REPAINT]
             });
             timer.start();
         }
 
+        // [SWING 2D PAINTING]: Custom donut chart rendering
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -723,7 +838,8 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
 
                 Color color = sliceColors[colorIdx % sliceColors.length];
                 g2.setColor(color);
-                g2.fill(new Arc2D.Double(cx - size / 2, cy - size / 2, size, size, -startAngle, -effectiveExtent, Arc2D.PIE));
+                g2.fill(new Arc2D.Double(cx - size / 2, cy - size / 2, size, size, -startAngle, -effectiveExtent,
+                        Arc2D.PIE));
 
                 // Legend entry
                 g2.fillRoundRect(legendX, legendY, 12, 12, 3, 3);
@@ -758,16 +874,23 @@ public class HabitAnalyticsDashboardFrame extends JFrame {
         }
     }
 
-    // =========================================================================
-    // Independent Main Entry Point
-    // =========================================================================
+    // ========================================================================================
+    // [SWING - APPLICATION ENTRY POINT & EDT]: main() Launch Method
+    // ========================================================================================
     public static void main(String[] args) {
+        // [SWING LOOK AND FEEL]: Set native OS Look and Feel
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
+        // [SWING THREAD SAFETY]: Initialize and display the JFrame on the Event
+        // Dispatch Thread (EDT)
         SwingUtilities.invokeLater(() -> {
+            // [SWING - JFRAME INSTANTIATION]: Create analytics window instance
             HabitAnalyticsDashboardFrame frame = new HabitAnalyticsDashboardFrame(null);
+
+            // [JFRAME METHOD]: Make the window visible
             frame.setVisible(true);
         });
     }
